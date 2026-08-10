@@ -51,7 +51,7 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session):
         db.commit()
 
         # 6. Extract NLP structural units (topics, schemes, budget, action items, votes)
-        nlp_data = ai_pipeline.extract_structured_minutes(raw_text, lang)
+        nlp_data = ai_pipeline.extract_structured_minutes(raw_text, lang, agenda=meeting.agenda)
 
         # 7. Create preliminary Minutes, ActionItems, and Votes
         minutes = models.Minutes(

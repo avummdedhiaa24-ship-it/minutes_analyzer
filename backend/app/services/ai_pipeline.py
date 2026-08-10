@@ -311,15 +311,17 @@ class AIPipelineService:
         raw_text = " ".join([d["text"] for d in diarized])
         return raw_text, diarized
 
-    def extract_structured_minutes(self, raw_text: str, language: str) -> Dict[str, Any]:
+    def extract_structured_minutes(self, raw_text: str, language: str, agenda: Optional[str] = None) -> Dict[str, Any]:
         """
-        Extracts structured corporate meeting minutes from the actual transcribed text.
+        Extracts structured corporate meeting minutes from the actual transcribed text and meeting agenda.
         Priority:
           1. Gemini API (if GEMINI_API_KEY is set)
           2. OpenAI API (if OPENAI_API_KEY is set)
           3. Smart local rule-based NLP parser (always available, no API needed)
         """
-        logger.info("Extracting structured corporate meeting elements from transcript...")
+        logger.info("Extracting structured corporate meeting elements from transcript and agenda...")
+
+        agenda_context = f"\n\nMeeting Agenda:\n{agenda}" if agenda else ""
 
         # ── 1. GEMINI API ──────────────────────────────────────────────────────
         gemini_key = settings.GEMINI_API_KEY if hasattr(settings, "GEMINI_API_KEY") else ""
@@ -330,8 +332,8 @@ class AIPipelineService:
                 model = genai.GenerativeModel("gemini-1.5-flash")
                 system_prompt = (
                     "You are an enterprise AI Meeting Intelligence assistant. "
-                    "Analyze the following transcript and return a strict JSON object matching this structure:\n"
-                    "- summary (string): A concise executive summary of the meeting.\n"
+                    "Analyze the transcript and agenda, then return a strict JSON object matching this structure:\n"
+                    "- summary (string): A concise executive summary of the meeting aligned with the agenda.\n"
                     "- topics (array of objects): Each item: {topic: string, discussion: string, source_segments: array of segment IDs}.\n"
                     "- decisions (array of objects): Each item: {decision: string, context: string, source_segments: array of segment IDs}.\n"
                     "- issues_and_risks (array of objects): Each item: {issue: string, impact: string, source_segments: array of segment IDs}.\n"
@@ -342,7 +344,7 @@ class AIPipelineService:
                     "Extract ONLY facts directly present in the transcript. Never fabricate deadlines, names, or financial figures. "
                     "Return ONLY valid JSON, no markdown code blocks."
                 )
-                prompt = f"{system_prompt}\n\nTranscript:\n{raw_text}"
+                prompt = f"{system_prompt}\n\nTranscript:\n{raw_text}{agenda_context}"
                 response = model.generate_content(prompt)
                 result_text = response.text.strip()
                 if result_text.startswith("```"):
@@ -359,7 +361,7 @@ class AIPipelineService:
             import httpx
             try:
                 system_prompt = (
-                    "You are an enterprise AI Meeting Intelligence assistant. Analyze this meeting transcript. "
+                    "You are an enterprise AI Meeting Intelligence assistant. Analyze this meeting transcript and agenda. "
                     "Extract: 1. Executive summary, 2. Key topics with discussion and source_segments, "
                     "3. Decisions made with context and source_segments, 4. Issues & risks, 5. Follow-ups, "
                     "6. Financial information (array, return [] if none mentioned), 7. Action items (with title, description, responsible_person, department, deadline, source_segments). "
@@ -370,7 +372,7 @@ class AIPipelineService:
                     "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": raw_text}
+                        {"role": "user", "content": f"{raw_text}{agenda_context}"}
                     ]
                 }
                 response = httpx.post(
@@ -388,12 +390,12 @@ class AIPipelineService:
 
         # ── 3. SMART LOCAL RULE-BASED NLP PARSER ──────────────────────────────
         logger.info("Using smart local rule-based NLP parser on transcribed text.")
-        return self._local_nlp_extract(raw_text, language)
+        return self._local_nlp_extract(raw_text, language, agenda)
 
-    def _local_nlp_extract(self, raw_text: str, language: str) -> Dict[str, Any]:
+    def _local_nlp_extract(self, raw_text: str, language: str, agenda: Optional[str] = None) -> Dict[str, Any]:
         """
         Smart rule-based NLP extractor that parses topics, decisions, issues,
-        action items, and financial metrics directly from the actual transcript text.
+        action items, and financial metrics directly from the actual transcript text and agenda.
         Works entirely offline with no external API dependencies.
         """
         text_lower = raw_text.lower()

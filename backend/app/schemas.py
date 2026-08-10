@@ -129,6 +129,8 @@ class MinutesBase(BaseModel):
     financial_information: Optional[List[Any]] = None
     additional_notes: Optional[str] = None
     version_number: Optional[int] = 1
+    unverified: Optional[bool] = False
+    unverified_fields: Optional[List[str]] = None
 
 class MinutesCreate(MinutesBase):
     pass

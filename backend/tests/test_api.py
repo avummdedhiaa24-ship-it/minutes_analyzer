@@ -160,3 +160,24 @@ def test_dashboard_summary():
     assert "open_action_items" in data
     assert "department_distribution" in data
 
+def test_faithfulness_guardrail_hallucinated_decision():
+    from app.services.ai_pipeline import ai_pipeline
+    
+    source_transcript = "The engineering team reviewed Q3 strategy and approved API indexing optimization for Friday deployment."
+    
+    hallucinated_minutes = {
+        "summary": "Summary text",
+        "decisions": [
+            {"decision": "Approved API indexing optimization"},
+            {"decision": "Sanctioned 10,000,000 dollars for quantum computer purchase"}
+        ],
+        "follow_ups": [],
+        "financial_information": []
+    }
+    
+    verified_result = ai_pipeline.verify_faithfulness(hallucinated_minutes, source_transcript)
+    assert verified_result["unverified"] is True
+    assert len(verified_result["unverified_fields"]) > 0
+    assert any("quantum" in field for field in verified_result["unverified_fields"])
+
+

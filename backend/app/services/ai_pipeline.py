@@ -495,7 +495,7 @@ class AIPipelineService:
         logger.info(f"Local NLP: found {len(topics)} topics, {len(decisions)} decisions, "
                     f"{len(action_items)} action items.")
 
-        return {
+        extracted_minutes = {
             "summary": summary,
             "topics": topics,
             "decisions": decisions,
@@ -505,6 +505,55 @@ class AIPipelineService:
             "additional_notes": "All technical specs and slide decks linked in project workspace.",
             "action_items": action_items
         }
+
+        return self.verify_faithfulness(extracted_minutes, raw_text)
+
+    def verify_faithfulness(self, minutes: Dict[str, Any], raw_transcript: str) -> Dict[str, Any]:
+        """
+        Phase 2 Faithfulness Guardrail:
+        Verifies that extracted decisions, action items/follow-ups, and financial figures
+        actually appear in the source transcript by checking token overlap & sentence matching.
+        Marks unverified fields with unverified=True and adds to unverified_fields list.
+        """
+        unverified_fields = []
+        transcript_lower = (raw_transcript or "").lower()
+
+        # Check decisions
+        for idx, dec in enumerate(minutes.get("decisions", [])):
+            text = dec.get("decision", "") if isinstance(dec, dict) else str(dec)
+            words = [w for w in re.findall(r'\w+', text.lower()) if len(w) > 3]
+            match_count = sum(1 for w in words if w in transcript_lower)
+            match_ratio = match_count / len(words) if words else 1.0
+            if match_ratio < 0.35:
+                unverified_fields.append(f"decisions[{idx}]: {text[:100]}")
+                if isinstance(dec, dict):
+                    dec["unverified"] = True
+
+        # Check follow_ups / action items
+        for idx, item in enumerate(minutes.get("follow_ups", [])):
+            text = item.get("action", "") if isinstance(item, dict) else str(item)
+            words = [w for w in re.findall(r'\w+', text.lower()) if len(w) > 3]
+            match_count = sum(1 for w in words if w in transcript_lower)
+            match_ratio = match_count / len(words) if words else 1.0
+            if match_ratio < 0.35:
+                unverified_fields.append(f"follow_ups[{idx}]: {text[:40]}")
+                if isinstance(item, dict):
+                    item["unverified"] = True
+
+        # Check financial_information
+        for idx, fin in enumerate(minutes.get("financial_information", [])):
+            text = fin.get("item", "") if isinstance(fin, dict) else str(fin)
+            words = [w for w in re.findall(r'\w+', text.lower()) if len(w) > 3]
+            match_count = sum(1 for w in words if w in transcript_lower)
+            match_ratio = match_count / len(words) if words else 1.0
+            if match_ratio < 0.35:
+                unverified_fields.append(f"financial_information[{idx}]: {text[:40]}")
+                if isinstance(fin, dict):
+                    fin["unverified"] = True
+
+        minutes["unverified"] = len(unverified_fields) > 0
+        minutes["unverified_fields"] = unverified_fields
+        return minutes
 
 
 

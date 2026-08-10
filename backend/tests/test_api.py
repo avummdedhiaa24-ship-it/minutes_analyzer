@@ -180,4 +180,19 @@ def test_faithfulness_guardrail_hallucinated_decision():
     assert len(verified_result["unverified_fields"]) > 0
     assert any("quantum" in field for field in verified_result["unverified_fields"])
 
+def test_audit_chain_verification_tampering():
+    client.post("/api/v1/auth/signup", json={"username": "adm_audit", "email": "adm@audit.com", "role": "System Admin", "password": "pass"})
+    login_res = client.post("/api/v1/auth/login", data={"username": "adm_audit", "password": "pass"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    meet_res = client.post("/api/v1/meetings", json={"title": "Audit Test Meeting", "date": "2026-08-10T10:00:00"}, headers=headers)
+    meet_id = meet_res.json()["id"]
+    
+    # Test valid meeting audit verification
+    res = client.get(f"/api/v1/audit/verify/{meet_id}")
+    assert res.status_code == 200
+    assert "valid" in res.json()
+    assert res.json()["valid"] is True
+
 

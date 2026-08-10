@@ -2,18 +2,18 @@ import os
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Gram Sabha AI Minutes"
+    PROJECT_NAME: str = "AI General Meeting Minutes & Transcripts Platform"
     API_V1_STR: str = "/api/v1"
     
     # Security
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "super-secret-gram-sabha-key-change-in-prod")
+    JWT_SECRET: str = os.getenv("JWT_SECRET", "super-secret-enterprise-key-change-in-prod")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     
     # DB
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql://postgres:postgres@localhost:5432/gram_sabha_db"
+        "sqlite:///./sql_app.db"
     )
     
     # Storage

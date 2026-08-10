@@ -126,10 +126,10 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
             <Building2 className="h-9 w-9 text-amber-400 animate-pulse" />
           </div>
           <h2 className="mt-4 text-3xl font-extrabold text-white tracking-tight">
-            National e-Panchayat Portal
+            AI General Meeting Platform
           </h2>
           <p className="mt-2 text-sm text-slate-400 font-medium">
-            Gram Sabha AI Minutes & Cryptographic Decision Registry
+            AI Meeting Minutes & Cryptographic Decision Registry
           </p>
         </div>
 
@@ -158,7 +158,7 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
                 isRegister ? "text-indigo-400 border-b-2 border-indigo-500" : "text-slate-400 hover:text-slate-200"
               }`}
             >
-              Register Citizen / Official
+              Register Employee / Executive
             </button>
           </div>
 
@@ -322,46 +322,45 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
                     onChange={(e) => setRole(e.target.value)}
                     className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:ring-2 focus:ring-indigo-500 outline-none font-medium"
                   >
-                    <option value="Citizen">Citizen (Public)</option>
-                    <option value="Secretary">Panchayat Secretary</option>
-                    <option value="Gram Sabha Moderator">Sarpanch (Moderator)</option>
-                    <option value="District Officer">District Officer</option>
-                    <option value="Admin">System Admin</option>
+                    <option value="Manager">Manager (Dept / Project Lead)</option>
+                    <option value="CEO">CEO (Chief Executive Officer)</option>
+                    <option value="System Admin">System Admin (Administrator)</option>
+                    <option value="Employee">Employee (Team Member)</option>
                   </select>
                 </div>
               </div>
 
               <div className="border-t border-slate-800 pt-3">
                 <span className="text-xs font-bold text-slate-500 flex items-center gap-1.5 mb-2.5">
-                  <MapPin className="h-3.5 w-3.5 text-indigo-400" /> Geographic Jurisdiction
+                  <MapPin className="h-3.5 w-3.5 text-indigo-400" /> Organization Jurisdiction
                 </span>
                 <div className="grid grid-cols-2 gap-3">
                   <input
                     type="text"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
-                    placeholder="Village"
+                    placeholder="Location / Office"
                     className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none font-medium"
                   />
                   <input
                     type="text"
                     value={block}
                     onChange={(e) => setBlock(e.target.value)}
-                    placeholder="Block"
+                    placeholder="Department"
                     className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none font-medium"
                   />
                   <input
                     type="text"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
-                    placeholder="District"
+                    placeholder="City"
                     className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none font-medium"
                   />
                   <input
                     type="text"
                     value={state}
                     onChange={(e) => setState(e.target.value)}
-                    placeholder="State"
+                    placeholder="Region / State"
                     className="bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white outline-none font-medium"
                   />
                 </div>
@@ -385,39 +384,39 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
         {/* Demo Fast Login Buttons */}
         <div className="bg-slate-850 border border-slate-800/80 rounded-2xl p-6 space-y-3">
           <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 uppercase">
-            <ShieldCheck className="h-4 w-4 text-indigo-400" /> Quick Role Logins (Development Mode)
+            <ShieldCheck className="h-4 w-4 text-indigo-400" /> Quick Role Logins (Enterprise Credentials)
           </div>
           <p className="text-[11px] text-slate-500 font-medium">
-            Click one of the official credentials seeded in the SQLite database to login instantly with their respective role and access levels.
+            Click one of the corporate seeded user credentials to login instantly with their respective role permissions.
           </p>
           <div className="grid grid-cols-2 gap-2.5">
             <button
-              onClick={() => handleQuickLogin("secretary")}
+              onClick={() => handleQuickLogin("ceo")}
               className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-bold text-white flex items-center justify-between"
             >
-              <span>Panchayat Secretary</span>
-              <span className="text-[9px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">secretary</span>
+              <span>CEO (Executive)</span>
+              <span className="text-[9px] text-indigo-400 bg-indigo-950 px-1.5 py-0.5 rounded font-mono">ceo</span>
             </button>
             <button
-              onClick={() => handleQuickLogin("moderator")}
+              onClick={() => handleQuickLogin("manager")}
               className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-bold text-white flex items-center justify-between"
             >
-              <span>Sarpanch (Moderator)</span>
-              <span className="text-[9px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">moderator</span>
+              <span>Manager (Host)</span>
+              <span className="text-[9px] text-emerald-400 bg-emerald-950 px-1.5 py-0.5 rounded font-mono">manager</span>
             </button>
             <button
-              onClick={() => handleQuickLogin("citizen1")}
+              onClick={() => handleQuickLogin("employee1")}
               className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-bold text-white flex items-center justify-between"
             >
-              <span>Citizen (Ram Singh)</span>
-              <span className="text-[9px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">citizen1</span>
+              <span>Employee (Member)</span>
+              <span className="text-[9px] text-slate-400 bg-slate-800 px-1.5 py-0.5 rounded font-mono">employee1</span>
             </button>
             <button
               onClick={() => handleQuickLogin("admin")}
               className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl text-[11px] font-bold text-white flex items-center justify-between"
             >
               <span>System Admin</span>
-              <span className="text-[9px] text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded">admin</span>
+              <span className="text-[9px] text-amber-400 bg-amber-950 px-1.5 py-0.5 rounded font-mono">admin</span>
             </button>
           </div>
         </div>

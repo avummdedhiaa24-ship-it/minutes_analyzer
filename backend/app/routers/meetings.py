@@ -9,8 +9,8 @@ from app.routers.auth import get_current_user, RoleChecker
 
 router = APIRouter(prefix="/meetings", tags=["Meetings"])
 
-# Only Secretaries, Moderators, or Admins can schedule or update meetings
-officer_roles = ["Secretary", "Gram Sabha Moderator", "District Officer", "State Officer", "Admin"]
+# Only System Admins, CEOs, or Managers can schedule or update meetings
+officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Gram Sabha Moderator", "District Officer", "State Officer"]
 is_officer = RoleChecker(officer_roles)
 
 @router.post("", response_model=schemas.MeetingResponse, status_code=status.HTTP_201_CREATED)
@@ -35,7 +35,7 @@ def create_meeting(
     db.refresh(meeting)
     
     # Generate unique QR code payload for local checkin validation
-    meeting.qr_code_data = f"gram_sabha_attendance:meeting_id={meeting.id}:date={meeting.date.strftime('%Y%m%d')}"
+    meeting.qr_code_data = f"meeting_pass:meeting_id={meeting.id}:date={meeting.date.strftime('%Y%m%d')}"
     db.commit()
     db.refresh(meeting)
     return meeting

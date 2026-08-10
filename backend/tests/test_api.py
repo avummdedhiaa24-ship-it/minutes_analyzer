@@ -46,26 +46,26 @@ def test_health_check():
 def test_signup_and_login():
     # 1. Register User
     signup_data = {
-        "username": "testsecretary",
-        "email": "secretary@gov.in",
-        "role": "Secretary",
+        "username": "testmanager",
+        "email": "manager@enterprise.ai",
+        "role": "Manager",
         "password": "securepassword123",
         "full_name": "Ramesh Patel",
         "age": 35,
         "gender": "Male",
         "social_category": "General",
-        "village": "Rampur East",
-        "block": "Kalyan",
-        "district": "Thane",
+        "village": "Headquarters",
+        "block": "Engineering",
+        "district": "Mumbai",
         "state": "Maharashtra"
     }
     response = client.post("/api/v1/auth/signup", json=signup_data)
     assert response.status_code == 201
-    assert response.json()["username"] == "testsecretary"
+    assert response.json()["username"] == "testmanager"
 
     # 2. Login
     login_data = {
-        "username": "testsecretary",
+        "username": "testmanager",
         "password": "securepassword123"
     }
     response = client.post("/api/v1/auth/login", data=login_data)
@@ -73,40 +73,39 @@ def test_signup_and_login():
     assert "access_token" in response.json()
 
 def test_create_meeting():
-    # Create Secretary User
+    # Create Manager User
     signup_data = {
-        "username": "sec1",
-        "email": "sec1@gov.in",
-        "role": "Secretary",
+        "username": "mgr1",
+        "email": "mgr1@enterprise.ai",
+        "role": "Manager",
         "password": "password",
         "full_name": "S. Patil"
     }
     client.post("/api/v1/auth/signup", json=signup_data)
-    login_res = client.post("/api/v1/auth/login", data={"username": "sec1", "password": "password"})
+    login_res = client.post("/api/v1/auth/login", data={"username": "mgr1", "password": "password"})
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     # Create Meeting
     meet_data = {
-        "title": "Ward 3 Water Pipeline Repair",
-        "description": "Allocating funds for pipeline leaks fixing",
+        "title": "API Infrastructure Sync",
+        "description": "Allocating resources for cloud API migration",
         "date": "2026-08-01T10:00:00",
-        "location": "Panchayat Hall",
-        "agenda": "Inspect leak spots, approve local estimates."
+        "location": "Conference Room A",
+        "agenda": "Review query indexing, approve cloud estimates."
     }
-    response = client.post("/api/v1/auth/signup", json=signup_data) # Registering again is fine, but it already exists. Let's make sure it handles it or we bypass it.
     
     # Scheduling Meeting
     response = client.post("/api/v1/meetings", json=meet_data, headers=headers)
     assert response.status_code == 201
-    assert response.json()["title"] == "Ward 3 Water Pipeline Repair"
+    assert response.json()["title"] == "API Infrastructure Sync"
     assert response.json()["status"] == "scheduled"
-    assert "gram_sabha_attendance" in response.json()["qr_code_data"]
+    assert "meeting_pass" in response.json()["qr_code_data"]
 
 def test_attendance_and_demographics():
-    # 1. Setup meeting and citizen
-    client.post("/api/v1/auth/signup", json={"username": "sec2", "email": "sec2@gov.in", "role": "Secretary", "password": "pass", "full_name": "Patil"})
-    login_res = client.post("/api/v1/auth/login", data={"username": "sec2", "password": "pass"})
+    # 1. Setup meeting and employee
+    client.post("/api/v1/auth/signup", json={"username": "mgr2", "email": "mgr2@enterprise.ai", "role": "Manager", "password": "pass", "full_name": "Patil"})
+    login_res = client.post("/api/v1/auth/login", data={"username": "mgr2", "password": "pass"})
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
     
@@ -114,9 +113,9 @@ def test_attendance_and_demographics():
     meet_id = meet_res.json()["id"]
 
     citizen_res = client.post("/api/v1/auth/signup", json={
-        "username": "citizen_test",
-        "email": "c@test.com",
-        "role": "Citizen",
+        "username": "employee_test",
+        "email": "emp@test.com",
+        "role": "Employee",
         "password": "pass",
         "full_name": "Ram Singh",
         "gender": "Male",
@@ -152,3 +151,12 @@ def test_chat_rag_endpoints():
     response = client.post("/api/v1/chat", json=chat_req)
     assert response.status_code == 200
     assert "citations" in response.json()
+
+def test_dashboard_summary():
+    response = client.get("/api/v1/dashboard/summary")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_meetings" in data
+    assert "open_action_items" in data
+    assert "department_distribution" in data
+

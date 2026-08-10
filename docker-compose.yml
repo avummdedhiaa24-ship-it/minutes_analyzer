@@ -3,12 +3,12 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: gram_sabha_postgres
+    container_name: corporate_postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: gram_sabha_db
+      POSTGRES_DB: corporate_meeting_db
     ports:
       - "5432:5432"
     volumes:
@@ -16,10 +16,10 @@ services:
 
   backend:
     build: ./backend
-    container_name: gram_sabha_backend
+    container_name: corporate_backend
     restart: always
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@db:5432/gram_sabha_db
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/corporate_meeting_db
       - UPLOAD_DIR=/app/uploads
       - AI_MOCK_MODE=True
     ports:
@@ -32,7 +32,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: gram_sabha_frontend
+    container_name: corporate_frontend
     restart: always
     ports:
       - "3000:3000"

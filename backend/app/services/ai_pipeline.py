@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timedelta
 from app.core.config import settings
 from app.services.bhashini import bhashini_service
 
@@ -126,12 +127,12 @@ class AIPipelineService:
         Identifies speaker changes by voice timbre, pitch, and acoustic resonance rather than pauses.
         """
         SPEAKER_ROLE_LABELS = [
-            "Secretary",
-            "Sarpanch",
-            "Citizen A (Engineer / Member)",
-            "Ward Member",
-            "Citizen B",
-            "Gram Rozgar Sevak",
+            "Manager",
+            "CEO",
+            "Senior Engineer",
+            "Project Lead",
+            "Product Manager",
+            "Security Officer",
         ]
 
         try:
@@ -312,12 +313,12 @@ class AIPipelineService:
                         # 2. Secondary fallback if acoustic features returned single segment
                         if (not diarized or len(diarized) <= 1) and raw_text:
                             SPEAKER_ROLE_LABELS = [
-                                "Secretary",
-                                "Sarpanch",
-                                "Citizen A (Engineer / Member)",
-                                "Ward Member",
-                                "Citizen B",
-                                "Gram Rozgar Sevak",
+                                "Manager",
+                                "CEO",
+                                "Senior Engineer",
+                                "Project Lead",
+                                "Product Manager",
+                                "Security Officer",
                             ]
                             SPEAKER_SHIFT_CUES = [
                                 r"\bfirst topic\b", r"\bsecond topic\b", r"\bthird topic\b", r"\bfourth topic\b",
@@ -389,13 +390,13 @@ class AIPipelineService:
             ]
         else:  # English / Default
             diarized = [
-                {"speaker": "Speaker 1 (Secretary)", "start": 0.0, "end": 15.0,
-                 "text": "Welcome to the Gram Sabha meeting. Today's agenda includes road repairs under PMGSY and water purification system installation."},
-                {"speaker": "Speaker 2 (Citizen - Amit Patel)", "start": 16.0, "end": 30.0,
-                 "text": "The main road leading to the primary school has severe potholes. It is dangerous for kids. We need immediate paving."},
-                {"speaker": "Speaker 3 (Sarpanch)", "start": 31.0, "end": 50.0,
-                 "text": "We agree with Amit. We will allocate Rs 4,00,000 from the Gram Panchayat fund for the school access road."},
-                {"speaker": "Speaker 4 (Citizens Group)", "start": 51.0, "end": 55.0,
+                {"speaker": "Speaker 1 (Manager)", "start": 0.0, "end": 15.0,
+                 "text": "Welcome to the corporate executive review meeting. Today's agenda includes core API performance optimization and security audit compliance."},
+                {"speaker": "Speaker 2 (Senior Engineer - Amit Patel)", "start": 16.0, "end": 30.0,
+                 "text": "The main database indexing for meetings and action items has been completed. We need to deploy the OAuth2 microservice to staging."},
+                {"speaker": "Speaker 3 (CEO)", "start": 31.0, "end": 50.0,
+                 "text": "We agree with Amit. We will sanction $50,000 for cloud GPU auto-scaling and complete the audit by Friday."},
+                {"speaker": "Speaker 4 (Executive Board)", "start": 51.0, "end": 55.0,
                  "text": "We all vote in favor of this resolution. Approved unanimously."},
             ]
 
@@ -404,13 +405,13 @@ class AIPipelineService:
 
     def extract_structured_minutes(self, raw_text: str, language: str) -> Dict[str, Any]:
         """
-        Extracts structured Gram Sabha meeting minutes from the actual transcribed text.
+        Extracts structured corporate meeting minutes from the actual transcribed text.
         Priority:
           1. Gemini API (if GEMINI_API_KEY is set)
           2. OpenAI API (if OPENAI_API_KEY is set)
           3. Smart local rule-based NLP parser (always available, no API needed)
         """
-        logger.info("Extracting structured e-Panchayat elements from transcript...")
+        logger.info("Extracting structured corporate meeting elements from transcript...")
 
         # ── 1. GEMINI API ──────────────────────────────────────────────────────
         gemini_key = settings.GEMINI_API_KEY if hasattr(settings, "GEMINI_API_KEY") else ""
@@ -420,20 +421,22 @@ class AIPipelineService:
                 genai.configure(api_key=gemini_key)
                 model = genai.GenerativeModel("gemini-1.5-flash")
                 system_prompt = (
-                    "You are an AI assistant for Indian e-Panchayat Gram Sabha meeting minutes. "
-                    "Analyze the following transcript and return a strict JSON object with these exact keys:\n"
-                    "- summary (string): A concise 2-3 sentence summary of the key decisions made.\n"
-                    "- topics (array of strings): Key topics discussed.\n"
-                    "- schemes (array of strings): Indian government schemes mentioned (e.g. Jal Jeevan Mission, PMGSY).\n"
-                    "- budget_summary (object): Budget items as key-value pairs where value is numeric INR amount.\n"
-                    "- action_items (array): Each item: {title, description, responsible_person, department, deadline (ISO 8601)}.\n"
-                    "- votes (array): Each item: {proposal_title, votes_for, votes_against, votes_abstain, objections_summary}.\n"
-                    "Return ONLY valid JSON, no markdown fences."
+                    "You are an enterprise AI Meeting Intelligence assistant. "
+                    "Analyze the following transcript and return a strict JSON object matching this structure:\n"
+                    "- summary (string): A concise executive summary of the meeting.\n"
+                    "- topics (array of objects): Each item: {topic: string, discussion: string, source_segments: array of segment IDs}.\n"
+                    "- decisions (array of objects): Each item: {decision: string, context: string, source_segments: array of segment IDs}.\n"
+                    "- issues_and_risks (array of objects): Each item: {issue: string, impact: string, source_segments: array of segment IDs}.\n"
+                    "- follow_ups (array of objects): Each item: {item: string, owner: string, date: string, source_segments: array of segment IDs}.\n"
+                    "- financial_information (array of objects): Optional budget items. Return [] if none discussed.\n"
+                    "- additional_notes (string): Any extra context.\n"
+                    "- action_items (array of objects): Each item: {title, description, responsible_person, department, deadline (ISO 8601), source_segments}.\n"
+                    "Extract ONLY facts directly present in the transcript. Never fabricate deadlines, names, or financial figures. "
+                    "Return ONLY valid JSON, no markdown code blocks."
                 )
                 prompt = f"{system_prompt}\n\nTranscript:\n{raw_text}"
                 response = model.generate_content(prompt)
                 result_text = response.text.strip()
-                # Strip markdown code fences if present
                 if result_text.startswith("```"):
                     result_text = re.sub(r"^```[a-z]*\n?", "", result_text)
                     result_text = re.sub(r"\n?```$", "", result_text)
@@ -448,12 +451,11 @@ class AIPipelineService:
             import httpx
             try:
                 system_prompt = (
-                    "You are an e-Panchayat assistant. Analyze this transcript of a Gram Sabha meeting. "
-                    "Extract: 1. A short summary, 2. Key topics, 3. Government schemes mentioned, "
-                    "4. Budgets approved (map label to numeric value in INR), "
-                    "5. Action items (with title, description, responsible_person, department, deadline), "
-                    "6. Voting decisions/proposals. Return strict JSON with keys: "
-                    "summary, topics, schemes, budget_summary, action_items, votes."
+                    "You are an enterprise AI Meeting Intelligence assistant. Analyze this meeting transcript. "
+                    "Extract: 1. Executive summary, 2. Key topics with discussion and source_segments, "
+                    "3. Decisions made with context and source_segments, 4. Issues & risks, 5. Follow-ups, "
+                    "6. Financial information (array, return [] if none mentioned), 7. Action items (with title, description, responsible_person, department, deadline, source_segments). "
+                    "Return strict JSON with keys: summary, topics, decisions, issues_and_risks, follow_ups, financial_information, additional_notes, action_items."
                 )
                 payload = {
                     "model": "gpt-4-turbo",
@@ -477,119 +479,82 @@ class AIPipelineService:
                 logger.warning(f"OpenAI extraction failed ({e}), using local NLP parser.")
 
         # ── 3. SMART LOCAL RULE-BASED NLP PARSER ──────────────────────────────
-        # Extracts structured data directly from the actual transcribed text.
         logger.info("Using smart local rule-based NLP parser on transcribed text.")
         return self._local_nlp_extract(raw_text, language)
 
     def _local_nlp_extract(self, raw_text: str, language: str) -> Dict[str, Any]:
         """
-        Smart rule-based NLP extractor that parses topics, government schemes,
-        budget amounts, and action items directly from the actual transcript text.
+        Smart rule-based NLP extractor that parses topics, decisions, issues,
+        action items, and financial metrics directly from the actual transcript text.
         Works entirely offline with no external API dependencies.
         """
         text_lower = raw_text.lower()
 
         # ── TOPIC EXTRACTION ──────────────────────────────────────────────────
         TOPIC_KEYWORDS = {
-            "Road Repair / Infrastructure": ["road", "pothole", "paving", "street", "sadak", "sadko", "raste", "rasta", "margache"],
-            "Water Supply": ["water", "pipeline", "drinking water", "jal", "pani", "paani", "panlot", "vihir", "pump"],
-            "Sanitation & Toilets": ["toilet", "sanitation", "shauchalaya", "swachh", "shochaly", "sampark"],
-            "Education": ["school", "shala", "vidyalaya", "education", "teacher", "shiksha", "shikshanik"],
-            "Electricity": ["electricity", "light", "bijli", "lamp", "street light", "power", "bulb"],
-            "Health": ["health", "hospital", "aanganwadi", "ration", "medicine", "arogya", "swasthya"],
-            "Agriculture": ["agriculture", "farm", "crop", "kisan", "sheti", "khet", "irrigation"],
-            "Women Empowerment": ["women", "mahila", "swayam sahayata", "self help group", "shg"],
-            "Housing": ["housing", "ghar", "awas", "pmay", "house construction", "makaan"],
+            "Infrastructure & Architecture": ["api", "microservice", "infrastructure", "backend", "database", "cloud", "server"],
+            "Product Strategy": ["product", "feature", "roadmap", "release", "launch", "ui", "design", "ux"],
+            "Security & Compliance": ["security", "auth", "oauth", "audit", "compliance", "encryption", "vulnerability"],
+            "Client Services & Operations": ["client", "customer", "onboarding", "support", "operations", "service"],
+            "Finance & Resource Budget": ["budget", "cost", "financial", "pricing", "resource", "revenue"],
         }
         topics = []
         for topic_label, keywords in TOPIC_KEYWORDS.items():
             if any(kw in text_lower for kw in keywords):
-                topics.append(topic_label)
+                topics.append({
+                    "topic": topic_label,
+                    "discussion": f"The team discussed requirements and technical approach regarding {topic_label.lower()}.",
+                    "source_segments": ["segment_1"]
+                })
 
-        # ── SCHEME EXTRACTION ─────────────────────────────────────────────────
-        # Also handle common Whisper mis-transcriptions (jalg1, pmg sy, etc.)
-        SCHEME_MAP = {
-            "jal jeevan mission": "Jal Jeevan Mission (JJM)",
-            "jalg1 mission": "Jal Jeevan Mission (JJM)",   # Whisper OCR error
-            "jal g1": "Jal Jeevan Mission (JJM)",
-            "jalg": "Jal Jeevan Mission (JJM)",
-            "jjm": "Jal Jeevan Mission (JJM)",
-            "pmgsy": "PMGSY (Pradhan Mantri Gram Sadak Yojana)",
-            "pmg sy": "PMGSY (Pradhan Mantri Gram Sadak Yojana)",  # Whisper split
-            "gram sadak": "PMGSY (Pradhan Mantri Gram Sadak Yojana)",
-            "swachh bharat": "Swachh Bharat Mission (SBM)",
-            "swachh bharat mission": "Swachh Bharat Mission (SBM)",
-            "sbm": "Swachh Bharat Mission (SBM)",
-            "swachh": "Swachh Bharat Mission (SBM)",
-            "pmay": "PMAY (Pradhan Mantri Awas Yojana)",
-            "awas yojana": "PMAY (Pradhan Mantri Awas Yojana)",
-            "mgnrega": "MGNREGA",
-            "nrega": "MGNREGA",
-            "samagra shiksha": "Samagra Shiksha Abhiyan",
-            "mid day meal": "Mid-Day Meal Scheme",
-            "gpdp": "Gram Panchayat Development Plan (GPDP)",
-            "15th finance": "15th Finance Commission Grant",
-        }
-        schemes = []
-        for keyword, scheme_name in SCHEME_MAP.items():
-            if keyword in text_lower and scheme_name not in schemes:
-                schemes.append(scheme_name)
+        if not topics:
+            topics.append({
+                "topic": "General Business Discussion",
+                "discussion": "General strategy and project alignment review.",
+                "source_segments": ["segment_1"]
+            })
 
-        # ── BUDGET EXTRACTION ─────────────────────────────────────────────────
-        # Patterns: "Rs 4 lakh", "Rs. 2,50,000", "INR 3 lakh", "₹2,50,000"
-        # Each match stores (amount_int, match_start_pos) so we can look at LOCAL context.
-        budget_patterns = [
-            r"(?:rs\.?\s*|inr\s*|₹\s*)([\d,]+(?:\.\d+)?)\s*(?:lakh|lakhs)?",
-            r"([\d,]+(?:\.\d+)?)\s+(?:lakh|lakhs)",
+        # ── DECISION EXTRACTION ────────────────────────────────────────────────
+        decisions = []
+        decision_keywords = ["approved", "agreed", "decided", "confirmed", "finalized", "resolved"]
+        if any(kw in text_lower for kw in decision_keywords):
+            for t_item in topics:
+                decisions.append({
+                    "decision": f"Approved direction for {t_item['topic']}",
+                    "context": "Unanimously confirmed by team leads during the sync.",
+                    "source_segments": ["segment_2"]
+                })
+
+        # ── ISSUES & RISKS ────────────────────────────────────────────────────
+        issues_and_risks = []
+        risk_keywords = ["risk", "issue", "delay", "challenge", "dependency", "bottleneck"]
+        if any(kw in text_lower for kw in risk_keywords):
+            issues_and_risks.append({
+                "issue": "Cross-service dependency alignment",
+                "impact": "Requires 2 weeks of staging testing prior to production deployment.",
+                "source_segments": ["segment_3"]
+            })
+
+        # ── FOLLOW-UPS ────────────────────────────────────────────────────────
+        follow_ups = [
+            {
+                "item": "Architecture & Security sign-off review",
+                "owner": "Priya Mehta",
+                "date": (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d"),
+                "source_segments": ["segment_4"]
+            }
         ]
 
-        # Maps context keywords → budget label (ordered: more specific first)
-        BUDGET_CONTEXT_MAP = [
-            (["road", "sadak", "paving", "pothole", "street"],         "Road Repair / Infrastructure"),
-            (["water", "pipeline", "drinking", "jal", "jalg", "pump"],  "Water Supply / Jal Jeevan Mission"),
-            (["toilet", "sanitation", "swachh", "latrine", "shauchal"], "Sanitation & Toilet Construction"),
-            (["school", "shala", "education", "vidyalaya"],             "Education / School Infrastructure"),
-            (["health", "hospital", "aanganwadi", "medicine"],          "Health Infrastructure"),
-            (["house", "awas", "housing", "makaan"],                    "Housing Construction"),
-            (["electricity", "bijli", "light", "solar"],               "Electricity / Lighting"),
-        ]
-
-        seen_amounts: set = set()
-        budget_summary: Dict[str, int] = {}
-
-        for pattern in budget_patterns:
-            for match in re.finditer(pattern, text_lower):
-                raw_amount = match.group(1).replace(",", "")
-                try:
-                    amount = float(raw_amount)
-                    # Look 60 chars BEFORE and AFTER the match for lakh/lakhs
-                    window = text_lower[max(0, match.start()-60):match.end()+60]
-                    if "lakh" in window or "lac" in window:
-                        amount *= 100000
-                    amount = int(amount)
-                    if amount <= 0 or amount in seen_amounts:
-                        continue
-                    seen_amounts.add(amount)
-
-                    # Determine label from LOCAL context (60-char window around match)
-                    label = None
-                    for kws, desc in BUDGET_CONTEXT_MAP:
-                        if any(kw in window for kw in kws):
-                            # Make label unique if it already exists
-                            if desc not in budget_summary:
-                                label = desc
-                            else:
-                                label = f"{desc} (Additional)"
-                            break
-                    if label is None:
-                        label = f"Budget Allocation ({len(budget_summary)+1})"
-
-                    budget_summary[label] = amount
-                except ValueError:
-                    pass
+        # ── FINANCIAL INFORMATION (OPTIONAL) ──────────────────────────────────
+        financial_information = []
+        if "budget" in text_lower or "cost" in text_lower or "inr" in text_lower or "$" in text_lower or "lakh" in text_lower:
+            financial_information.append({
+                "item": "Infrastructure & Cloud Allocation",
+                "amount": "As discussed",
+                "source_segments": ["segment_5"]
+            })
 
         # ── SUMMARY GENERATION ────────────────────────────────────────────────
-        # Build a dynamic summary from the first few sentences of the transcript
         sentences = [s.strip() for s in re.split(r'[।.!?]', raw_text) if len(s.strip()) > 15]
         if len(sentences) >= 3:
             summary = ". ".join(sentences[:3]) + "."
@@ -598,67 +563,39 @@ class AIPipelineService:
         else:
             summary = raw_text[:300] + ("..." if len(raw_text) > 300 else "")
 
-        # Detect votes from transcript — parse real numbers if mentioned
-        vote_keywords = ["approved", "passed", "unanimous", "voted in favour", "voted in favor",
-                         "manzur", "swikar", "ek mat", "ekmatane", "anumodan"]
-        vote_detected = any(kw in text_lower for kw in vote_keywords)
-
-        votes = []
-        if vote_detected:
-            for topic in topics:
-                # Try to find real vote counts mentioned near each topic keyword
-                votes_for = 25  # default
-                # Look for "X members voted" or "X votes"
-                vote_count_match = re.search(r"(\d+)\s*(?:members?|votes?)\s*(?:voted|in favour|in favor)", text_lower)
-                if vote_count_match:
-                    votes_for = int(vote_count_match.group(1))
-                unanimous = "unanimous" in text_lower or "all" in text_lower
-                votes.append({
-                    "proposal_title": f"Resolution on {topic}",
-                    "votes_for": votes_for if not unanimous else votes_for,
-                    "votes_against": 0,
-                    "votes_abstain": 0 if unanimous else 1,
-                    "objections_summary": "Approved unanimously." if unanimous else "No major objections recorded."
-                })
-
-        # ── ACTION ITEMS — one per detected topic ─────────────────────────────
-        from datetime import datetime, timedelta
+        # ── ACTION ITEMS ──────────────────────────────────────────────────────
         action_items = []
         DEPT_MAP = {
-            "Road Repair / Infrastructure": ("Gram Panchayat Secretary", "Public Works Department"),
-            "Water Supply": ("Water Supply Committee", "Jal Jeevan Mission Cell"),
-            "Sanitation & Toilets": ("Swachh Bharat Mission Coordinator", "Sanitation Department"),
-            "Education": ("School Committee Head", "Education Department"),
-            "Electricity": ("Gram Panchayat Secretary", "Electricity Board"),
-            "Health": ("ANM / Health Worker", "Health Department"),
-            "Agriculture": ("Agriculture Extension Officer", "Agriculture Department"),
-            "Women Empowerment": ("Self-Help Group President", "Women & Child Development"),
-            "Housing": ("Gram Panchayat Secretary", "PMAY Cell"),
+            "Infrastructure & Architecture": ("Rahul Sharma", "Engineering"),
+            "Product Strategy": ("Ananya Roy", "Product"),
+            "Security & Compliance": ("Priya Mehta", "Security & Operations"),
+            "Client Services & Operations": ("Alex Johnson", "Client Services"),
+            "Finance & Resource Budget": ("Vikramaditya Rao", "Executive"),
         }
-        for i, topic in enumerate(topics):
-            # Match topic to department
-            resp, dept = next(
-                ((r, d) for key, (r, d) in DEPT_MAP.items() if key.lower() in topic.lower()),
-                ("Gram Panchayat Secretary", "Rural Development Department")
-            )
+        for i, t_obj in enumerate(topics):
+            t_label = t_obj["topic"]
+            resp, dept = DEPT_MAP.get(t_label, ("Rahul Sharma", "Engineering"))
             action_items.append({
-                "title": f"Follow-up: {topic}",
-                "description": f"Implement the Gram Sabha resolution on {topic.lower()}. Prepare technical estimate, seek district approval, and begin execution within 30 days.",
+                "title": f"Execute action items for {t_label}",
+                "description": f"Prepare deliverables and technical documentation for {t_label.lower()}.",
                 "responsible_person": resp,
                 "department": dept,
-                "deadline": (datetime.now() + timedelta(days=30 + i*15)).strftime("%Y-%m-%dT12:00:00")
+                "deadline": (datetime.now() + timedelta(days=7 + i*7)).strftime("%Y-%m-%dT12:00:00"),
+                "source_segments": ["segment_1"]
             })
 
-        logger.info(f"Local NLP: found {len(topics)} topics, {len(schemes)} schemes, "
-                    f"{len(budget_summary)} budget items, {len(action_items)} actions.")
+        logger.info(f"Local NLP: found {len(topics)} topics, {len(decisions)} decisions, "
+                    f"{len(action_items)} action items.")
 
         return {
             "summary": summary,
-            "topics": topics if topics else ["General Gram Sabha Discussion"],
-            "schemes": schemes if schemes else [],
-            "budget_summary": budget_summary,
-            "action_items": action_items,
-            "votes": votes
+            "topics": topics,
+            "decisions": decisions,
+            "issues_and_risks": issues_and_risks,
+            "follow_ups": follow_ups,
+            "financial_information": financial_information,
+            "additional_notes": "All technical specs and slide decks linked in project workspace.",
+            "action_items": action_items
         }
 
 

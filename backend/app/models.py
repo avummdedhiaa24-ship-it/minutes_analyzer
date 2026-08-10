@@ -10,7 +10,7 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="Citizen")  # Citizen, Secretary, Moderator, DistrictOfficer, StateOfficer, Admin
+    role = Column(String, default="Employee")  # System Admin, CEO, Manager, Employee
     full_name = Column(String)
     age = Column(Integer)
     gender = Column(String)  # Male, Female, Other
@@ -21,7 +21,7 @@ class User(Base):
     state = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    meetings = relationship("Meeting", back_populates="secretary")
+    meetings = relationship("Meeting", back_populates="secretary", foreign_keys="Meeting.secretary_id")
     attendance = relationship("Attendance", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user")
 
@@ -31,21 +31,30 @@ class Meeting(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True, nullable=False)
     description = Column(Text)
+    meeting_type = Column(String, default="General")  # General, Executive, Product, Engineering, Client, Sales, HR/Ops, Board, Legal, Data Science, Strategy, Other
+    department = Column(String, default="General")    # Engineering, Product, Executive, Client Services, Sales, Operations, Finance, HR, Legal, Data Science, Strategy, Other
     date = Column(DateTime, nullable=False)
     location = Column(String)
+    meeting_link = Column(String)
     scheduled_start = Column(DateTime)
     actual_start = Column(DateTime)
     actual_end = Column(DateTime)
-    status = Column(String, default="scheduled")  # scheduled, ongoing, processing, draft, approved
+    status = Column(String, default="scheduled")  # scheduled, ongoing, processing, draft, approved, finalized
     agenda = Column(Text)
     agenda_pdf_url = Column(String)
     qr_code_data = Column(String)
     secretary_id = Column(Integer, ForeignKey("users.id"))
+    chairperson_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     audio_url = Column(String)
     video_url = Column(String)
+    current_revision = Column(Integer, default=1)
+    finalized_at = Column(DateTime, nullable=True)
+    finalized_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    secretary = relationship("User", back_populates="meetings")
+    secretary = relationship("User", back_populates="meetings", foreign_keys=[secretary_id])
+    chairperson = relationship("User", foreign_keys=[chairperson_id])
+    finalized_by = relationship("User", foreign_keys=[finalized_by_id])
     attendance = relationship("Attendance", back_populates="meeting")
     transcripts = relationship("Transcript", back_populates="meeting", uselist=False)
     minutes = relationship("Minutes", back_populates="meeting", uselist=False)
@@ -88,9 +97,13 @@ class Minutes(Base):
     id = Column(Integer, primary_key=True, index=True)
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
     summary = Column(Text)
-    topics = Column(JSON)  # List of main topic strings
-    schemes = Column(JSON)  # List of Government schemes discussed
-    budget_summary = Column(JSON)  # Dict of allocations
+    topics = Column(JSON)             # List of key topic objects [{topic, discussion, source_segments}]
+    decisions = Column(JSON)          # List of decision objects [{decision, context, source_segments}]
+    issues_and_risks = Column(JSON)   # List of issue/risk objects [{issue, impact, source_segments}]
+    follow_ups = Column(JSON)         # List of follow-up objects [{item, owner, date, source_segments}]
+    financial_information = Column(JSON) # List of financial objects (optional)
+    additional_notes = Column(Text)
+    version_number = Column(Integer, default=1)
     digital_hash = Column(String)
     approved_by_id = Column(Integer, ForeignKey("users.id"))
     approved_at = Column(DateTime)
@@ -106,12 +119,15 @@ class ActionItem(Base):
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
     title = Column(String, nullable=False)
     description = Column(Text)
-    responsible_person = Column(String)
+    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # Linked app user (optional)
+    responsible_person = Column(String)                                  # Plain text owner fallback
     department = Column(String)
     deadline = Column(DateTime)
-    status = Column(String, default="pending")  # pending, completed
+    status = Column(String, default="pending")                           # pending, in_progress, completed
+    source_segments = Column(JSON)                                       # List of segment IDs
 
     meeting = relationship("Meeting", back_populates="action_items")
+    owner_user = relationship("User", foreign_keys=[owner_user_id])
 
 class Vote(Base):
     __tablename__ = "votes"
@@ -131,7 +147,7 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
-    action = Column(String, nullable=False)  # edit_transcript, edit_minutes, finalize_minutes
+    action = Column(String, nullable=False)  # edit_transcript, edit_minutes, finalize_minutes, revision_created
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     modified_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     previous_state = Column(JSON)
@@ -152,3 +168,4 @@ class Translation(Base):
     transcript_translated_json = Column(JSON)
 
     meeting = relationship("Meeting", back_populates="translations")
+

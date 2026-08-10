@@ -4,9 +4,15 @@ export type LanguageCode = "en" | "hi" | "mr" | "te";
 
 export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
   // Navigation & Header
-  "Digital India": { en: "Digital India", hi: "डिजिटल इंडिया", mr: "डिजिटल इंडिया", te: "డిజిటల్ ఇండియా" },
-  "e-Panchayat Initiative": { en: "e-Panchayat Initiative", hi: "ई-पंचायत पहल", mr: "ई-पंचायत उपक्रम", te: "ఈ-పంచాయతీ చొరవ" },
-  "Gram Sabha AI Minutes": { en: "Gram Sabha AI Minutes", hi: "Gram Sabha AI Minutes", mr: "Gram Sabha AI Minutes", te: "Gram Sabha AI Minutes" },
+  "Digital India": { en: "Corporate Enterprise", hi: "कॉरपोरेट एंटरप्राइज", mr: "कॉर्पोरेट एंटरप्राइझ", te: "కార్పొరేట్ ఎంటర్‌ప్రైజ్" },
+  "e-Panchayat Initiative": { en: "AI Meeting Minutes Platform", hi: "AI बैठक कार्यवृत्त मंच", mr: "AI बैठकीचे इतिवृत्त व्यासपीठ", te: "AI సమావేశ నిమిషాల ప్లాట్‌ఫారమ్" },
+  "Gram Sabha AI Minutes": { en: "AI Meeting Minutes Platform", hi: "AI बैठक कार्यवृत्त मंच", mr: "AI बैठकीचे इतिवृत्त व्यासपीठ", te: "AI సమావేశ నిమిషాల ప్లాట్‌ఫారమ్" },
+  "AI General Meeting Minutes & Transcripts": { en: "AI General Meeting Minutes & Transcripts", hi: "AI सामान्य बैठक कार्यवृत्त और प्रतिलेख", mr: "AI सर्वसाधारण बैठकीचे इतिवृत्त आणि उतारे", te: "AI జనరల్ సమావేశ నిమిషాలు & ట్రాన్స్‌క్రిప్ట్‌లు" },
+  "Transcript & Meeting Minutes Studio": { en: "Transcript & Meeting Minutes Studio", hi: "प्रतिलेख और बैठक कार्यवृत्त स्टूडियो", mr: "उतारा आणि बैठक इतिवृत्त स्टुडिओ", te: "ట్రాన్స్‌క్రిప్ట్ & సమావేశ నిమిషాల స్టూడియో" },
+  "Re-generate Minutes from Transcript": { en: "Re-generate Minutes from Transcript", hi: "प्रतिलेख से कार्यवृत्त पुनः उत्पन्न करें", mr: "उताऱ्यावरून इतिवृत्त पुन्हा तयार करा", te: "ట్రాన్స్‌క్రిప్ట్ నుండి నిమిషాలను మళ్లీ రూపొందించండి" },
+  "Save Transcript Changes": { en: "Save Transcript Changes", hi: "प्रतिलेख परिवर्तन सहेजें", mr: "उतारा बदल जतन करा", te: "ట్రాన్స్‌క్రిప్ట్ మార్పులను సేవ్ చేయండి" },
+  "Action Items": { en: "Action Items", hi: "कार्य सूची", mr: "कृती बाबी", te: "చర్యల జాబితా" },
+  "Decisions & Resolutions": { en: "Decisions & Resolutions", hi: "निर्णय और संकल्प", mr: "निर्णय आणि ठराव", te: "నిర్ణయాలు & తీర్మానాలు" },
   "Log Out": { en: "Log Out", hi: "लॉग आउट", mr: "लॉग आउट", te: "లాగ్ అవుట్" },
   "Switch User": { en: "Switch User", hi: "उपयोगकर्ता बदलें", mr: "वापरकर्ता बदला", te: "వినియోగదారుని మార్చండి" },
   "Modules": { en: "Modules", hi: "मॉड्यूल", mr: "मॉड्यूल", te: "మాడ్యూల్స్" },
@@ -15,40 +21,40 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
   "Record / ASR Uploader": { en: "Record / ASR Uploader", hi: "रिकॉर्ड / एएसआर अपलोडर", mr: "रेकॉर्ड / एएसआर अपलोडर", te: "రికార్డ్ / ASR అప్‌లోడర్" },
   "Review & Sign": { en: "Review & Sign", hi: "समीक्षा और हस्ताक्षर", mr: "आढावा आणि स्वाक्षरी", te: "సమీక్ష & సంతకం" },
   "RAG Assistant": { en: "RAG Assistant", hi: "आरएजी सहायक", mr: "आरएजी सहाय्यक", te: "RAG సహాయకుడు" },
-  "Citizen Portal": { en: "Citizen Portal", hi: "नागरिक पोर्टल", mr: "नागरिक पोर्टल", te: "సిటిజన్ పోర్టల్" },
+  "Citizen Portal": { en: "Participant Directory", hi: "भागीदार निर्देशिका", mr: "सहभागी निर्देशिका", te: "భాగస్వామ్య డైరెక్టరీ" },
   "Audit Ledger": { en: "Audit Ledger", hi: "ऑडिट बही", mr: "ऑडिट लेजर", te: "ఆడిట్ రిజిస్టర్" },
 
   // Dashboard Cards
   "Namaste! Gram Panchayat Digital Dashboard": {
-    en: "Namaste! Gram Panchayat Digital Dashboard",
-    hi: "नमस्ते! ग्राम पंचायत डिजिटल डैशबोर्ड",
-    mr: "नमस्ते! ग्रामपंचायत डिजिटल डॅशबोर्ड",
-    te: "నమస్కారం! గ్రామ పంచాయతీ డిజిటల్ డాష్‌బోర్డ్"
+    en: "AI Meeting Intelligence Dashboard",
+    hi: "AI बैठक इंटेलिजेंस डैशबोर्ड",
+    mr: "AI बैठक बुद्धिमत्ता डॅशबोर्ड",
+    te: "AI సమావేశ ఇంటెలిజెన్స్ డాష్‌బోర్డ్"
   },
   "Real-time indicators, digital meeting ledger tracking, and Indic Whisper translation portal.": {
-    en: "Real-time indicators, digital meeting ledger tracking, and Indic Whisper translation portal.",
-    hi: "वास्तविक समय के संकेतक, डिजिटल बैठक बही ट्रैकिंग, और भारतीय भाषा व्हिस्पर अनुवाद पोर्टल।",
-    mr: "थेट निर्देशक, डिजिटल बैठक नोंदवही ट्रॅकिंग आणि भारतीय भाषा व्हिस्पर भाषांतर पोर्टल.",
-    te: "నిజ-సమయ సూచికలు, డిజిటల్ సమావేశ రిజిస్టర్ ట్రాకింగ్ మరియు భారతీయ భాషా విస్పర్ అనువాద పోర్టల్."
+    en: "Real-time meeting analytics, speaker-diarized transcripts, and multilingual translation portal.",
+    hi: "वास्तविक समय बैठक विश्लेषण, वक्ता-आधारित प्रतिलेख और बहुभाषी अनुवाद पोर्टल।",
+    mr: "थेट बैठक विश्लेषण, वक्त्यानुसार उतारे आणि बहुभाषिक भाषांतर पोर्टल.",
+    te: "రియల్ టైమ్ సమావేశ విశ్లేషణలు, మాట్లాడేవారి ఆధారిత ట్రాన్స్‌క్రిప్ట్‌లు మరియు బహుభాషా అనువాద పోర్టల్."
   },
   "Record Live Sabha": {
-    en: "Record Live Sabha",
-    hi: "लाइव सभा रिकॉर्ड करें",
-    mr: "थेट सभा रेकॉर्ड करा",
-    te: "లైవ్ సభను రికార్డ్ చేయండి"
+    en: "Record Live Meeting",
+    hi: "लाइव बैठक रिकॉर्ड करें",
+    mr: "थेट बैठक रेकॉर्ड करा",
+    te: "లైవ్ సమావేశాన్ని రికార్డ్ చేయండి"
   },
   "Retrieving official e-Panchayat indicators...": {
-    en: "Retrieving official e-Panchayat indicators...",
-    hi: "आधिकारिक ई-पंचायत संकेतक प्राप्त किए जा रहे हैं...",
-    mr: "अधिकृत ई-पंचायत निर्देशक मिळवत आहे...",
-    te: "అధికారిక ఈ-పంచాయతీ సూచికలను పొందుతోంది..."
+    en: "Retrieving official meeting indicators...",
+    hi: "आधिकारिक बैठक संकेतक प्राप्त किए जा रहे हैं...",
+    mr: "अधिकृत बैठक निर्देशक मिळवत आहे...",
+    te: "అధికారిక సమావేశ సూచికలను పొందుతోంది..."
   },
-  "Meetings Conducted": { en: "Meetings Conducted", hi: "आयोजित बैठकें", mr: "आयोजित बैठका", te: "నిర్వहించిన సమావేశాలు" },
-  "Women Participation": { en: "Women Participation", hi: "महिला भागीदारी", mr: "महिला सहभाग", te: "మహిళల భాగస్వామ్యం" },
-  "Action Items Done": { en: "Action Items Done", hi: "पूर्ण किए गए कार्य", mr: "पूर्ण केलेल्या कृती बाबी", te: "పూర్తయिन చర్యలు" },
-  "Funds Sanctioned": { en: "Funds Sanctioned", hi: "स्वीकृत निधि", mr: "मंजूर निधी", te: "మంజూరైన నిధులు" },
+  "Meetings Conducted": { en: "Meetings Conducted", hi: "आयोजित बैठकें", mr: "आयोजित बैठका", te: "నిర్వహించిన సమావేశాలు" },
+  "Women Participation": { en: "Participant Engagement", hi: "भागीदारी दर", mr: "सहभाग प्रमाण", te: "భాగస్వామ్య నిష్పత్తి" },
+  "Action Items Done": { en: "Action Items Done", hi: "पूर्ण किए गए कार्य", mr: "पूर्ण केलेल्या कृती बाबी", te: "పూర్తయిన చర్యలు" },
+  "Funds Sanctioned": { en: "Budget & Funds Sanctioned", hi: "स्वीकृत बजट व निधि", mr: "मंजूर अर्थसंकल्प व निधी", te: "మంజూరైన నిధులు" },
   "All scheduled/historic": { en: "All scheduled/historic", hi: "सभी अनुसूचित/ऐतिहासिक", mr: "सर्व नियोजित/ऐतिहासिक", te: "అన్ని షెడ్యూల్డ్/చారిత్రక" },
-  "Women empowerment ratio": { en: "Women empowerment ratio", hi: "महिला सशक्तिकरण अनुपात", mr: "महिला सक्षमीकरण प्रमाण", te: "మహిళా సాధికారత నిష్పत्ति" },
+  "Women empowerment ratio": { en: "Participant engagement ratio", hi: "भागीदारी अनुपात", mr: "सहभाग प्रमाण", te: "భాగస్వామ్య నిష్పత్తి" },
   "signed minutes logs": { en: "signed minutes logs", hi: "हस्ताक्षरित बैठक विवरण लॉग", mr: "स्वाक्षरी केलेले इतिवृत्त लॉग", te: "సంతకం చేసిన సమావేశ లాగ్‌లు" },
   "100% auditable via ledger": { en: "100% auditable via ledger", hi: "बही द्वारा शत-प्रतिशत ऑडिट योग्य", mr: "वहीद्वारे १००% तपासणीयोग्य", te: "లెడ్జర్ ద్వారా 100% ఆడిట్ చేయదగినది" },
   "MEETING TITLE": { en: "MEETING TITLE", hi: "बैठक का शीर्षक", mr: "बैठकीचे शीर्षक", te: "సమావేశ శీర్షిక" },
@@ -56,40 +62,40 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
   "STATUS": { en: "STATUS", hi: "स्थिति", mr: "स्थिती", te: "స్థితి" },
   "LOCATION": { en: "LOCATION", hi: "स्थान", mr: "ठिकाण", te: "స్థలం" },
   "MEETINGS CONDUCTED": { en: "MEETINGS CONDUCTED", hi: "आयोजित बैठकें", mr: "आयोजित बैठका", te: "निर्वहించిన సమావేశాలు" },
-  "WOMEN PARTICIPATION": { en: "WOMEN PARTICIPATION", hi: "महिला भागीदारी", mr: "महिला सहभाग", te: "మహిళల భాగస్వామ్యం" },
+  "WOMEN PARTICIPATION": { en: "PARTICIPANT ENGAGEMENT", hi: "भागीदारी दर", mr: "सहभाग प्रमाण", te: "భాగస్వామ్య నిష్పత్తి" },
   "ACTION ITEMS DONE": { en: "ACTION ITEMS DONE", hi: "पूर्ण किए गए कार्य", mr: "पूर्ण केलेल्या कृती बाबी", te: "పూర్తయిన చర్యలు" },
   "FUNDS SANCTIONED": { en: "FUNDS SANCTIONED", hi: "स्वीकृत निधि", mr: "मंजूर निधी", te: "మంజూరైన నిధులు" },
-  "Budgetary Allocations (INR)": { en: "Budgetary Allocations (INR)", hi: "बजटीय आवंटन (INR)", mr: "अर्थसंकल्पीय वाटप (INR)", te: "బడ్జెట్ కేటాయింపులు (INR)" },
-  "Marginalized & Social Category Split": { en: "Marginalized & Social Category Split", hi: "वंचित और सामाजिक श्रेणी विभाजन", mr: "वंचित आणि सामाजिक प्रवर्ग विभाजन", te: "వెనుకబడిన & సామాజिक వర్గాల విభజన" },
+  "Budgetary Allocations (INR)": { en: "Budgetary Allocations", hi: "बजटीय आवंटन", mr: "अर्थसंकल्पीय वाटप", te: "బడ్జెట్ కేటాయింపులు" },
+  "Marginalized & Social Category Split": { en: "Participant Category & Role Breakdown", hi: "भागीदार श्रेणी व भूमिका विभाजन", mr: "सहभागी वर्ग व भूमिका विभाजन", te: "భాగస్వామ్య వర్గం & పాత్ర విభజన" },
   "Speaking Time Distribution": { en: "Speaking Time Distribution", hi: "बोलने के समय का वितरण", mr: "बोलण्याच्या वेळेचे वाटप", te: "మాట్లాడే సమయం పంపిణీ" },
-  "Recent Gram Sabha Logs": { en: "Recent Gram Sabha Logs", hi: "हालिया ग्राम सभा लॉग", mr: "अलीकडील ग्रामसभा लॉग", te: "ఇటీवలి గ్రామ సభ లాగ్‌లు" },
+  "Recent Gram Sabha Logs": { en: "Recent Meeting Minutes Logs", hi: "हालिया बैठक विवरण लॉग", mr: "अलीकडील बैठक इतिवृत्त लॉग", te: "ఇటీవలి సమావేశ నిమిషాల లాగ్‌లు" },
   "View All Logs": { en: "View All Logs", hi: "सभी लॉग देखें", mr: "सर्व लॉग पहा", te: "అన్ని లాగ్‌లను వీక్షించండి" },
-  "Panchayat Secretary Quick Login": { en: "Panchayat Secretary Quick Login", hi: "पंचायत सचिव त्वरित लॉगिन", mr: "पंचायत सचिव त्वरित लॉगिन", te: "పంచాయతీ కార్యదర్శి త్వరిత లాగిన్" },
+  "Panchayat Secretary Quick Login": { en: "Meeting Host / Moderator Login", hi: "बैठक मेजबान / मॉडरेटर लॉगिन", mr: "बैठक आयोजक लॉगिन", te: "సమావేశ హోస్ట్ లాగిన్" },
 
   // Meetings page
   "Meetings & Check-in QR Codes": { en: "Meetings & Check-in QR Codes", hi: "बैठक और चेक-इन क्यूआर कोड", mr: "बैठकी आणि चेक-इन क्यूआर कोड", te: "సమావేశాలు & చెక్-ఇన్ QR కోడ్‌లు" },
   "Schedule Sabha assemblies, print Check-in passes, and trace attendance registers.": {
-    en: "Schedule Sabha assemblies, print Check-in passes, and trace attendance registers.",
-    hi: "सभा बैठकों को शेड्यूल करें, चेक-इन पास प्रिंट करें और उपस्थिति पंजिकाओं को ट्रैक करें।",
-    mr: "सभांचे वेळापत्रक तयार करा, चेक-इन पास मुद्रित करा आणि उपस्थिती नोंदणीचा मागोवा घ्या.",
-    te: "సభ సమావేశాలను షెడ్యూల్ చేయండి, చెక్-ఇన్ పాస్‌లను ప్రింట్ చేయండి మరియు హాజరు రిజిస్టర్‌లను ట్రాక్ చేయండి."
+    en: "Schedule meetings, print Check-in passes, and trace participant attendance registers.",
+    hi: "बैठकों को शेड्यूल करें, चेक-इन पास प्रिंट करें और उपस्थिति पंजिकाओं को ट्रैक करें।",
+    mr: "बैठकांचे वेळापत्रक तयार करा, चेक-इन पास मुद्रित करा आणि उपस्थिती नोंदणीचा मागोवा घ्या.",
+    te: "సమావేశాలను షెడ్యూల్ చేయండి, చెక్-ఇన్ పాస్‌లను ప్రింట్ చేయండి మరియు హాజరు రిజిస్టర్‌లను ట్రాక్ చేయండి."
   },
-  "Schedule New Gram Sabha": { en: "Schedule New Gram Sabha", hi: "नई ग्राम सभा शेड्यूल करें", mr: "नवीन ग्रामसभा आयोजित करा", te: "కొత్తグラム సభను షెడ్యూల్ చేయండి" },
-  "Sabha Title": { en: "Sabha Title", hi: "सभा का शीर्षक", mr: "सभेचे शीर्षक", te: "సభ శీర్షిక" },
+  "Schedule New Gram Sabha": { en: "Schedule New Meeting", hi: "नई बैठक शेड्यूल करें", mr: "नवीन बैठक आयोजित करा", te: "కొత్త సమావేశాన్ని షెడ్యూల్ చేయండి" },
+  "Sabha Title": { en: "Meeting Title", hi: "बैठक का शीर्षक", mr: "बैठकीचे शीर्षक", te: "సమావేశ శీర్షిక" },
   "Proposed Date & Time": { en: "Proposed Date & Time", hi: "प्रस्तावित तिथि और समय", mr: "प्रस्तावित तारीख आणि वेळ", te: "ప్రతిపాదిత తేదీ & సమయం" },
-  "Assembly Location": { en: "Assembly Location", hi: "बैठक का स्थान", mr: "सभेचे ठिकाण", te: "సమావేశ స్థలం" },
-  "Detailed Agenda": { en: "Detailed Agenda", hi: "विस्तृत एजेंडा", mr: "सविस्तर अजेंडा", te: "వివరణాत्मक ఎజెండా" },
-  "Schedule Gram Sabha": { en: "Schedule Gram Sabha", hi: "ग्राम सभा शेड्यूल करें", mr: "ग्रामसभा आयोजित करा", te: "గ్రామ సభను షెడ్యూల్ చేయండి" },
+  "Assembly Location": { en: "Meeting Location", hi: "बैठक का स्थान", mr: "बैठकीचे ठिकाण", te: "సమావేశ స్థలం" },
+  "Detailed Agenda": { en: "Detailed Agenda", hi: "विस्तृत एजेंडा", mr: "सविस्तर अजेंडा", te: "వివరణాత్మక ఎజెండా" },
+  "Schedule Gram Sabha": { en: "Schedule Meeting", hi: "बैठक शेड्यूल करें", mr: "बैठक आयोजित करा", te: "సమావేశాన్ని షెడ్యూల్ చేయండి" },
   "QR Check-in Pass": { en: "QR Check-in Pass", hi: "क्यूआर चेक-इन पास", mr: "क्यूआर चेक-इन पास", te: "QR చెక్-ఇన్ పాస్" },
-  "Official Sabha Schedules & Agenda Registry": { en: "Official Sabha Schedules & Agenda Registry", hi: "आधिकारिक सभा अनुसूची और एजेंडा रजिस्ट्री", mr: "अधिकृत सभा वेळापत्रक आणि अजेंडा नोंदणी", te: "అధికారిక సభ షెడ్యూల్‌లు & ఎజెండా రిజిస్టర్" },
+  "Official Sabha Schedules & Agenda Registry": { en: "Official Meeting Schedules & Agenda Registry", hi: "आधिकारिक बैठक अनुसूची और एजेंडा रजिस्ट्री", mr: "अधिकृत बैठक वेळापत्रक आणि अजेंडा नोंदणी", te: "అధికారిక సమావేశ షెడ్యూల్‌లు & ఎజెండా రిజిస్టర్" },
 
   // Record / ASR
-  "Indic Speech-to-Text Pipeline (ASR)": { en: "Indic Speech-to-Text Pipeline (ASR)", hi: "भारतीय भाषा भाषण-से-पाठ पाइपलाइन (ASR)", mr: "भारतीय भाषा भाषण-ते-मजकूर पाइपलाइन (ASR)", te: "భారతీయ భాషా స్పీచ్-టు-టెక్స్ట్ పైప్‌లైన్ (ASR)" },
+  "Indic Speech-to-Text Pipeline (ASR)": { en: "AI Speech-to-Text Pipeline (ASR)", hi: "AI भाषण-से-पाठ पाइपलाइन (ASR)", mr: "AI भाषण-ते-मजकूर पाइपलाइन (ASR)", te: "AI స్పీచ్-టు-టెక్స్ట్ పైప్‌లైన్ (ASR)" },
   "Capture live Gram Sabha audio with noise filter buffers, or upload pre-recorded meetings.": {
-    en: "Capture live Gram Sabha audio with noise filter buffers, or upload pre-recorded meetings.",
-    hi: "शोर फिल्टर बफर के साथ लाइव ग्राम सभा ऑडियो कैप्चर करें, या पूर्व-रिकॉर्ड की गई बैठकें अपलोड करें।",
-    mr: "आवाज फिल्टर बफरसह थेट ग्रामसभा ऑडिओ कॅप्चर करा किंवा आधी रेकॉर्ड केलेल्या बैठका अपलोड करा.",
-    te: "నాయిస్ ఫిల్టర్ బఫర్‌లతో ప్రత్యక్ష గ్రామ సభ ఆడియోను క్యాప్చర్ చేయండి లేదా ముందే రికార్డ్ చేసిన సమావేశాలను అప్‌లోడ్ చేయండి."
+    en: "Capture live meeting audio with noise filter buffers, or upload pre-recorded meetings.",
+    hi: "शोर फिल्टर बफर के साथ लाइव बैठक ऑडियो कैप्चर करें, या पूर्व-रिकॉर्ड की गई बैठकें अपलोड करें।",
+    mr: "आवाज फिल्टर बफरसह थेट बैठक ऑडिओ कॅप्चर करा किंवा आधी रेकॉर्ड केलेल्या बैठका अपलोड करा.",
+    te: "నాయిస్ ఫిల్టర్ బఫర్‌లతో ప్రత్యక్ష సమావేశ ఆడియోను క్యాప్చర్ చేయండి లేదా ముందే రికార్డ్ చేసిన సమావేశాలను అప్‌లోడ్ చేయండి."
   },
   "Assembly Live Mic Streamer": { en: "Assembly Live Mic Streamer", hi: "सभा लाइव माइक स्ट्रीमर", mr: "थेट माईक प्रवाहक", te: "సభ లైవ్ మైక్ స్ట్రీమర్" },
   "Directly records and streams audio segments to the ASR indic pipeline.": {
@@ -123,12 +129,12 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
   "Approve & Sign Ledger": { en: "Approve & Sign Ledger", hi: "लेज़र स्वीकृत और हस्ताक्षरित करें", mr: "लेजर मंजूर आणि स्वाक्षरी करा", te: "రిజిస్టర్‌ను ఆమోదించండి & సంతకం చేయండి" },
 
   // Chat
-  "e-Panchayat RAG assistant": { en: "e-Panchayat RAG assistant", hi: "ई-पंचायत आरएजी सहायक", mr: "ई-पंचायत आरएजी सहाय्यक", te: "ఈ-పంచాయతీ RAG సహాయకుడు" },
+  "e-Panchayat RAG assistant": { en: "Corporate RAG Assistant", hi: "कॉरपोरेट आरएजी सहायक", mr: "कॉर्पोरेट आरएजी सहाय्यक", te: "కార్పొరేట్ RAG సహాయకుడు" },
   "Greetings! I am the e-Panchayat RAG assistant. Ask me anything about local Gram Sabha resolutions, budgetary allocations, or scheme updates.": {
-    en: "Greetings! I am the e-Panchayat RAG assistant. Ask me anything about local Gram Sabha resolutions, budgetary allocations, or scheme updates.",
-    hi: "नमस्कार! मैं ई-पंचायत आरएजी सहायक हूं। मुझसे स्थानीय ग्राम सभा प्रस्तावों, बजटीय आवंटन या योजना अपडेट के बारे में कुछ भी पूछें।",
-    mr: "नमस्कार! मी ई-पंचायत आरएजी सहाय्यक आहे. मला स्थानिक ग्रामसभा ठराव, अर्थसंकल्पीय वाटप किंवा योजना अद्यतनांबद्दल काहीही विचारा.",
-    te: "నమస్కారం! నేను ఈ-పంచాయతీ RAG సహాయకుడిని. స్థానిక గ్రామ సభ తీర్మానాలు, బడ్జెట్ కేటాయింపులు లేదా పథకాల నవీకరణల గురించి నన్ను ఏదైనా అడగండి."
+    en: "Greetings! I am the Corporate RAG assistant. Ask me anything about corporate meeting resolutions, budgetary allocations, or action items.",
+    hi: "नमस्कार! मैं कॉरपोरेट आरएजी सहायक हूं। मुझसे कॉर्पोरेट बैठक प्रस्तावों, बजटीय आवंटन या कार्रवाई मदों के बारे में कुछ भी पूछें।",
+    mr: "नमस्कार! मी कॉर्पोरेट आरएजी सहाय्यक आहे. मला कॉर्पोरेट बैठक ठराव, अर्थसंकल्पीय वाटप किंवा कृती बाबींबद्दल काहीही विचारा.",
+    te: "నమస్కారం! నేను కార్పొరేట్ RAG సహాయకుడిని. కార్పొరేట్ సమావేశ తీర్మానాలు, బడ్జెట్ కేటాయింపులు లేదా చర్యల అంశాల గురించి నన్ను ఏదైనా అడగండి."
   },
   "Ask the AI Assistant...": { en: "Ask the AI Assistant...", hi: "एआई सहायक से पूछें...", mr: "एआय सहाय्यकाला विचारा...", te: "AI సహాయకుడిని అడగండి..." },
 
@@ -168,10 +174,10 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
     te: "ప్రశ్న పంపండి"
   },
   "Contextual semantic search over archived Gram Sabha transcripts.": {
-    en: "Contextual semantic search over archived Gram Sabha transcripts.",
-    hi: "संग्रहीत ग्राम सभा प्रतिलेखों पर प्रासंगिक शब्दार्थ खोज।",
-    mr: "संग्रहित ग्रामसभा उतार्‍यांवर संदर्भानुसार अर्थपूर्ण शोध.",
-    te: "ఆర్కైవ్ చేసిన గ్రామ సభ ట్రాన్స్క్రిప్ట్‌లపై సందర్భోచిత సెమాంటిక్ శోధన."
+    en: "Contextual semantic search over archived corporate meeting transcripts.",
+    hi: "संग्रहीत कॉर्पोरेट बैठक प्रतिलेखों पर प्रासंगिक शब्दार्थ खोज।",
+    mr: "संग्रहित कॉर्पोरेट बैठक उताऱ्यांवर संदर्भानुसार अर्थपूर्ण शोध.",
+    te: "ఆర్కైవ్ చేసిన కార్పొరేట్ సమావేశ ట్రాన్స్క్రిప్ట్‌లపై సందర్భోచిత సెమాంటిక్ శోధన."
   },
   "Official Citations & Sources": {
     en: "Official Citations & Sources",
@@ -186,16 +192,16 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
     te: "సమావేశాన్ని ఫిల్టర్ చేయండి:"
   },
   "All Sabha Archives": {
-    en: "All Sabha Archives",
-    hi: "सभी सभा अभिलेखागार",
-    mr: "सर्व सभा संग्रहण",
-    te: "అన్ని సభ ఆర్కైవ్‌లు"
+    en: "All Meeting Archives",
+    hi: "सभी बैठक संग्रह",
+    mr: "सर्व बैठक संग्रह",
+    te: "అన్ని సమావేశ ఆర్కైవ్‌లు"
   },
   "Target Sabha Ledger:": {
-    en: "Target Sabha Ledger:",
-    hi: "लक्षित सभा बही:",
-    mr: "लक्षित सभा नोंदवही:",
-    te: "లక్ష్య సభ రిజిస్టర్:"
+    en: "Target Meeting Ledger:",
+    hi: "लक्षित बैठक बही:",
+    mr: "लक्षित बैठक नोंदवही:",
+    te: "లక్ష్య సమావేశ రిజిస్టర్:"
   },
   "No meetings found": {
     en: "No meetings found",

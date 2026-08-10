@@ -12,7 +12,7 @@ from app.services.ai_pipeline import ai_pipeline
 
 router = APIRouter(prefix="/minutes", tags=["Minutes & Human Review"])
 
-officer_roles = ["Secretary", "Gram Sabha Moderator", "District Officer", "State Officer", "Admin"]
+officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Gram Sabha Moderator", "District Officer", "State Officer"]
 is_officer = RoleChecker(officer_roles)
 
 @router.get("/{meeting_id}", response_model=schemas.MinutesResponse)
@@ -44,21 +44,30 @@ def update_minutes_draft(
     prev_state = {
         "summary": minutes.summary,
         "topics": minutes.topics,
-        "schemes": minutes.schemes,
-        "budget_summary": minutes.budget_summary
+        "decisions": minutes.decisions,
+        "issues_and_risks": minutes.issues_and_risks,
+        "follow_ups": minutes.follow_ups,
+        "financial_information": minutes.financial_information,
+        "additional_notes": minutes.additional_notes
     }
 
     # Update fields
     minutes.summary = minutes_in.summary
     minutes.topics = minutes_in.topics
-    minutes.schemes = minutes_in.schemes
-    minutes.budget_summary = minutes_in.budget_summary
+    minutes.decisions = minutes_in.decisions
+    minutes.issues_and_risks = minutes_in.issues_and_risks
+    minutes.follow_ups = minutes_in.follow_ups
+    minutes.financial_information = minutes_in.financial_information
+    minutes.additional_notes = minutes_in.additional_notes
     
     current_state = {
         "summary": minutes.summary,
         "topics": minutes.topics,
-        "schemes": minutes.schemes,
-        "budget_summary": minutes.budget_summary
+        "decisions": minutes.decisions,
+        "issues_and_risks": minutes.issues_and_risks,
+        "follow_ups": minutes.follow_ups,
+        "financial_information": minutes.financial_information,
+        "additional_notes": minutes.additional_notes
     }
 
     # Create audit log record
@@ -92,8 +101,11 @@ def finalize_minutes(
     current_state = {
         "summary": minutes.summary,
         "topics": minutes.topics,
-        "schemes": minutes.schemes,
-        "budget_summary": minutes.budget_summary
+        "decisions": minutes.decisions,
+        "issues_and_risks": minutes.issues_and_risks,
+        "follow_ups": minutes.follow_ups,
+        "financial_information": minutes.financial_information,
+        "additional_notes": minutes.additional_notes
     }
 
     # Compute secure hash
@@ -134,7 +146,7 @@ def export_minutes(
     # Fetch/translate minutes details based on requested language
     summary = meeting.minutes.summary
     topics = meeting.minutes.topics or []
-    schemes = meeting.minutes.schemes or []
+    decisions = meeting.minutes.decisions or []
     
     if lang != "original":
         # Check cached Translation table first

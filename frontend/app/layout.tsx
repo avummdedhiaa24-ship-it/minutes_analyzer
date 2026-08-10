@@ -86,35 +86,32 @@ export default function RootLayout({
   };
 
   // RBAC definitions for front-end modules
-  // Citizen: Dashboard, Meetings, RAG Assistant
-  // Secretary: Dashboard, Meetings, Record, RAG Assistant
-  // Gram Sabha Moderator (Sarpanch): Dashboard, Meetings, Review & Sign, RAG Assistant
-  // District Officer: Dashboard, Meetings, Audit Ledger, RAG Assistant
-  // Admin: All
+  // Employee: Dashboard, Meetings, Attendance, RAG Assistant
+  // Manager: Dashboard, Meetings, Attendance, Record, Review & Sign, RAG Assistant
+  // CEO: Dashboard, Meetings, Attendance, Review & Sign, Audit Ledger, RAG Assistant
+  // System Admin: All
   const getRoleAllowedTabs = (role: string): string[] => {
     switch (role) {
-      case "Citizen":
-        return ["dashboard", "meetings", "chat"];
-      case "Secretary":
-        return ["dashboard", "meetings", "record", "verify", "chat"];
-      case "Gram Sabha Moderator":
-        return ["dashboard", "meetings", "verify", "chat"];
-      case "District Officer":
-      case "State Officer":
-        return ["dashboard", "meetings", "audit", "chat"];
-      case "Admin":
+      case "Employee":
+        return ["dashboard", "meetings", "attendance", "chat"];
+      case "Manager":
+        return ["dashboard", "meetings", "attendance", "record", "verify", "chat"];
+      case "CEO":
+        return ["dashboard", "meetings", "attendance", "verify", "audit", "chat"];
+      case "System Admin":
       default:
-        return ["dashboard", "meetings", "record", "verify", "chat", "citizen", "audit"];
+        return ["dashboard", "meetings", "attendance", "record", "verify", "chat", "citizen", "audit"];
     }
   };
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "meetings", label: "Meetings & Check-in", icon: Calendar },
+    { id: "meetings", label: "Meetings & Registry", icon: Calendar },
+    { id: "attendance", label: "Attendance Portal", icon: UserCheck },
     { id: "record", label: "Record / ASR Uploader", icon: Mic },
     { id: "verify", label: "Review & Sign", icon: FileCheck },
     { id: "chat", label: "RAG Assistant", icon: MessageSquare },
-    { id: "citizen", label: "Citizen Portal", icon: Search },
+    { id: "citizen", label: "Participant Directory", icon: Search },
     { id: "audit", label: "Audit Ledger", icon: ShieldCheck }
   ];
 
@@ -159,12 +156,12 @@ export default function RootLayout({
               </div>
               <div>
                 <div className="flex items-center space-x-1.5">
-                  <span className="text-xs font-semibold tracking-wider text-amber-600 dark:text-amber-400 uppercase">{t("Digital India")}</span>
+                  <span className="text-xs font-semibold tracking-wider text-indigo-600 dark:text-indigo-400 uppercase">AI Intelligence Platform</span>
                   <span className="text-xs text-slate-400">|</span>
-                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase">{t("e-Panchayat Initiative")}</span>
+                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase">Meeting Transcripts & Minutes</span>
                 </div>
                 <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-indigo-950 dark:from-white dark:to-slate-200 bg-clip-text text-transparent">
-                  {t("Gram Sabha AI Minutes")}
+                  {t("AI General Meeting Minutes & Transcripts")}
                 </h1>
               </div>
             </div>

@@ -10,10 +10,10 @@ from app.routers.auth import get_current_user, RoleChecker
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
 
-# Panchayat Center GPS (Mock reference: central point of a village)
-PANCHAYAT_LAT = 19.0760
-PANCHAYAT_LNG = 72.8777
-MAX_ALLOWED_DISTANCE_KM = 3.0  # Max 3km radius from Gram Panchayat office
+# Corporate HQ Center GPS (Central Enterprise Office)
+HQ_LAT = 19.0760
+HQ_LNG = 72.8777
+MAX_ALLOWED_DISTANCE_KM = 3.0  # Max 3km radius from Corporate HQ office
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     # Calculate distance between two coordinates in kilometers
@@ -52,7 +52,7 @@ def checkin_attendance(
     # Perform GPS proximity check if coordinates are provided
     verified = True
     if checkin.gps_lat and checkin.gps_lng:
-        distance = haversine_distance(PANCHAYAT_LAT, PANCHAYAT_LNG, checkin.gps_lat, checkin.gps_lng)
+        distance = haversine_distance(HQ_LAT, HQ_LNG, checkin.gps_lat, checkin.gps_lng)
         if distance > MAX_ALLOWED_DISTANCE_KM:
             verified = False  # Flag check-in if too far, but do not necessarily crash (allow fallback secretary review)
 

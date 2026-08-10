@@ -135,7 +135,7 @@ def ask_chatbot(
             )
 
         response_text = (
-            "I have located the relevant Gram Sabha files matching your query. "
+            "I have located the relevant corporate meeting files matching your query. "
             "In which language would you like me to answer? Please reply with: English, Hindi (हिंदी), or Marathi (मराठी)."
         )
 

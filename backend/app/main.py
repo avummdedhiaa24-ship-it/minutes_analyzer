@@ -11,7 +11,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="Automating documentation, e-governance minutes, translation, and RAG semantic search for Gram Sabha meetings.",
+    description="Automating documentation, corporate meeting minutes, translation, and RAG semantic search for corporate enterprise meetings.",
     version="1.0.0",
 )
 

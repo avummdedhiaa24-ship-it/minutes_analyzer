@@ -12,84 +12,71 @@ def seed_db():
         # Create tables
         Base.metadata.create_all(bind=engine)
 
-        # 1. Seed Users
+        # 1. Seed Corporate Users
         users_to_add = [
             {
                 "username": "admin",
-                "email": "admin@panchayat.gov.in",
-                "role": "Admin",
-                "full_name": "Rajendra Prasad",
+                "email": "admin@enterprise.ai",
+                "role": "System Admin",
+                "full_name": "Vikramaditya Rao",
                 "age": 45,
                 "gender": "Male",
                 "social_category": "General",
-                "village": "Rampur",
-                "block": "Kalyan",
-                "district": "Thane",
+                "village": "Headquarters",
+                "block": "IT & Infrastructure",
+                "district": "Mumbai",
                 "state": "Maharashtra"
             },
             {
-                "username": "secretary",
-                "email": "secretary@panchayat.gov.in",
-                "role": "Secretary",
-                "full_name": "Rajesh Kumar",
-                "age": 38,
+                "username": "ceo",
+                "email": "ceo@enterprise.ai",
+                "role": "CEO",
+                "full_name": "Rajendra Prasad",
+                "age": 52,
                 "gender": "Male",
-                "social_category": "OBC",
-                "village": "Rampur",
-                "block": "Kalyan",
-                "district": "Thane",
+                "social_category": "General",
+                "village": "Headquarters",
+                "block": "Executive Leadership",
+                "district": "Mumbai",
                 "state": "Maharashtra"
             },
             {
-                "username": "moderator",
-                "email": "sarpanch@panchayat.gov.in",
-                "role": "Gram Sabha Moderator",
-                "full_name": "Sarita Patil",
-                "age": 42,
+                "username": "manager",
+                "email": "manager@enterprise.ai",
+                "role": "Manager",
+                "full_name": "Ananya Roy",
+                "age": 34,
                 "gender": "Female",
                 "social_category": "General",
-                "village": "Rampur",
-                "block": "Kalyan",
-                "district": "Thane",
+                "village": "Headquarters",
+                "block": "Engineering & Product",
+                "district": "Mumbai",
                 "state": "Maharashtra"
             },
             {
-                "username": "citizen1",
-                "email": "ram.singh@gmail.com",
-                "role": "Citizen",
-                "full_name": "Ram Singh",
+                "username": "employee1",
+                "email": "priya.m@enterprise.ai",
+                "role": "Employee",
+                "full_name": "Priya Mehta",
                 "age": 29,
-                "gender": "Male",
-                "social_category": "SC",
-                "village": "Rampur East",
-                "block": "Kalyan",
-                "district": "Thane",
-                "state": "Maharashtra"
-            },
-            {
-                "username": "citizen2",
-                "email": "sunita.kadam@gmail.com",
-                "role": "Citizen",
-                "full_name": "Sunita Kadam",
-                "age": 31,
                 "gender": "Female",
-                "social_category": "ST",
-                "village": "Rampur West",
-                "block": "Kalyan",
-                "district": "Thane",
+                "social_category": "General",
+                "village": "Headquarters",
+                "block": "Security & Compliance",
+                "district": "Mumbai",
                 "state": "Maharashtra"
             },
             {
-                "username": "citizen3",
-                "email": "amit.patel@gmail.com",
-                "role": "Citizen",
-                "full_name": "Amit Patel",
-                "age": 62,
+                "username": "employee2",
+                "email": "alex.j@enterprise.ai",
+                "role": "Employee",
+                "full_name": "Alex Johnson",
+                "age": 31,
                 "gender": "Male",
                 "social_category": "General",
-                "village": "Rampur Center",
-                "block": "Kalyan",
-                "district": "Thane",
+                "village": "Headquarters",
+                "block": "DevOps Operations",
+                "district": "Mumbai",
                 "state": "Maharashtra"
             }
         ]
@@ -121,111 +108,161 @@ def seed_db():
             else:
                 seeded_users[u_data["username"]] = existing
 
-        # 2. Seed Meetings
-        sec_id = seeded_users["secretary"].id
-        mod_id = seeded_users["moderator"].id
+        sec_id = seeded_users["manager"].id
+        mod_id = seeded_users["ceo"].id
 
-        # Meeting 1: Water Supply and Sanitation (Approved)
-        m1 = db.query(models.Meeting).filter(models.Meeting.title == "Water Supply and Sanitation Review").first()
+        # 2. Seed Meeting 1: Q3 Executive Strategy & Product Review (Approved)
+        m1 = db.query(models.Meeting).filter(models.Meeting.title == "Q3 Executive Strategy & Product Review").first()
         if not m1:
             m1 = models.Meeting(
-                title="Water Supply and Sanitation Review",
-                description="Special meeting to review Jal Jeevan Mission progress and sanitation drives.",
-                date=datetime.now() - timedelta(days=10),
-                location="Panchayat Hall Rampur",
-                scheduled_start=datetime.now() - timedelta(days=10, hours=1),
-                actual_start=datetime.now() - timedelta(days=10, hours=1),
-                actual_end=datetime.now() - timedelta(days=10),
+                title="Q3 Executive Strategy & Product Review",
+                description="Executive meeting covering Q3 strategy, microservice decoupling, and cloud budget.",
+                date=datetime.now() - timedelta(days=5),
+                meeting_type="Executive",
+                department="Product & Engineering",
+                location="Conference Room A / Hybrid",
+                meeting_link="https://meet.enterprise.ai/q3-review",
                 status="approved",
-                agenda="1. Clean drinking water supply pipelines.\n2. Sanitation under Swachh Bharat Abhiyan.\n3. Open discussions.",
-                qr_code_data="gram_sabha_attendance:meeting_id=1",
-                secretary_id=sec_id
+                agenda="1. Microservice infrastructure roadmap.\n2. Cloud GPU budget approval.\n3. Security compliance sign-off.",
+                qr_code_data="meeting_pass:meeting_id=1",
+                secretary_id=sec_id,
+                chairperson_id=mod_id
             )
             db.add(m1)
             db.commit()
             db.refresh(m1)
-            print("Seeded meeting: Water Supply and Sanitation Review")
 
-            # Attendance for Meeting 1
-            att1 = models.Attendance(meeting_id=m1.id, user_id=seeded_users["citizen1"].id, method="qr", gps_lat=19.0762, gps_lng=72.8778, verified=True)
-            att2 = models.Attendance(meeting_id=m1.id, user_id=seeded_users["citizen2"].id, method="qr", gps_lat=19.0759, gps_lng=72.8775, verified=True)
-            att3 = models.Attendance(meeting_id=m1.id, user_id=seeded_users["citizen3"].id, method="manual", verified=True)
-            db.add_all([att1, att2, att3])
-
-            # Transcript for Meeting 1
             t1 = models.Transcript(
                 meeting_id=m1.id,
-                raw_text="The meeting discussed fixing the drinking water well in Rampur East and laying pipes under the Jal Jeevan Mission. We allocated three lakh rupees.",
+                raw_text="Ananya opened the Q3 strategy review. Rahul presented the microservice decoupling roadmap. Vikramaditya approved fifty thousand dollars for cloud GPU infrastructure.",
                 diarized_json=[
-                    {"speaker": "Secretary", "start": 0.0, "end": 8.0, "text": "Let us discuss the first agenda point regarding clean drinking water pipeline extensions."},
-                    {"speaker": "Ram Singh", "start": 8.5, "end": 15.0, "text": "Our side of the village is not getting adequate water. We need a direct tube well connection."},
-                    {"speaker": "Sarpanch", "start": 15.5, "end": 25.0, "text": "We approve three lakh rupees for this pipe extension from the Gram Panchayat development fund."}
+                    {"speaker": "Ananya Roy (Host)", "start": 0.0, "end": 8.0, "text": "Welcome team to the Q3 executive strategy review."},
+                    {"speaker": "Rahul Sharma (Chair)", "start": 8.5, "end": 18.0, "text": "We recommend decoupling our core API microservices before Q4 to scale speech diarization."},
+                    {"speaker": "Vikramaditya Rao (VP)", "start": 18.5, "end": 28.0, "text": "We approve the microservice roadmap and sanction fifty thousand dollars for GPU cluster nodes."}
+                ],
+                language="en",
+                confidence=0.98
+            )
+            db.add(t1)
+
+            min1 = models.Minutes(
+                meeting_id=m1.id,
+                summary="The executive team reviewed Q3 strategy, approved microservice decoupling, and sanctioned $50,000 for cloud GPU scaling.",
+                topics=[
+                    {"topic": "Microservice Architecture", "discussion": "Decoupling core API microservices before Q4.", "source_segments": ["segment_2"]}
+                ],
+                decisions=[
+                    {"decision": "Approved microservice migration & $50,000 cloud GPU budget", "context": "Confirmed by VP.", "source_segments": ["segment_3"]}
+                ],
+                issues_and_risks=[
+                    {"issue": "Legacy API backward compatibility", "impact": "Requires 2 weeks testing.", "source_segments": ["segment_2"]}
+                ],
+                follow_ups=[
+                    {"item": "Security compliance review", "owner": "Priya Mehta", "date": (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d"), "source_segments": ["segment_3"]}
+                ],
+                financial_information=[
+                    {"item": "Cloud GPU Cluster Allocation", "amount": "$50,000", "source_segments": ["segment_3"]}
+                ],
+                additional_notes="Slide decks uploaded to repository.",
+                digital_hash="8f9a2c3b4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b",
+                approved_by_id=mod_id,
+                approved_at=datetime.utcnow() - timedelta(days=5)
+            )
+            db.add(min1)
+
+            act1 = models.ActionItem(
+                meeting_id=m1.id,
+                title="Provision GPU cloud clusters for speech pipeline",
+                description="Set up auto-scaling GPU compute instances for Whisper transcription.",
+                owner_user_id=seeded_users["manager"].id,
+                responsible_person="Ananya Roy",
+                department="Engineering",
+                deadline=datetime.now() + timedelta(days=14),
+                status="in_progress",
+                source_segments=["segment_3"]
+            )
+            db.add(act1)
+            db.commit()
+
+            rag_service.add_document(
+                meeting_id=m1.id,
+                title=m1.title,
+                text="The executive team reviewed Q3 strategy, approved microservice decoupling, and sanctioned $50,000 for cloud GPU scaling."
+            )
+            print("Seeded meeting: Q3 Executive Strategy & Product Review")
+
+        # 3. Seed Meeting 2: Core API & Infrastructure Architecture Sync (Needs Review / Draft)
+        m2 = db.query(models.Meeting).filter(models.Meeting.title == "Core API & Infrastructure Architecture Sync").first()
+        if not m2:
+            m2 = models.Meeting(
+                title="Core API & Infrastructure Architecture Sync",
+                description="Engineering deep-dive on OAuth2 microservice migration, database query indexing, and SLA monitoring.",
+                date=datetime.now() - timedelta(days=1),
+                meeting_type="Engineering",
+                department="Engineering",
+                location="Virtual Zoom Link",
+                meeting_link="https://meet.enterprise.ai/api-sync",
+                status="draft",
+                agenda="1. OAuth2 microservice migration.\n2. PostgreSQL indexing optimization.\n3. Action item assignments.",
+                qr_code_data="meeting_pass:meeting_id=2",
+                secretary_id=sec_id,
+                chairperson_id=mod_id
+            )
+            db.add(m2)
+            db.commit()
+            db.refresh(m2)
+
+            t2 = models.Transcript(
+                meeting_id=m2.id,
+                raw_text="Rahul called the API sync to order. Priya outlined the security audit requirements. Alex confirmed database index optimization is complete.",
+                diarized_json=[
+                    {"speaker": "Rahul Sharma", "start": 0.0, "end": 10.0, "text": "Let us review our core API endpoint performance and database indexing."},
+                    {"speaker": "Priya Mehta", "start": 10.5, "end": 22.0, "text": "I will submit the security audit report by Friday."},
+                    {"speaker": "Alex Johnson", "start": 22.5, "end": 35.0, "text": "Database indexing on meetings and action_items tables is complete."}
                 ],
                 language="en",
                 confidence=0.97
             )
-            db.add(t1)
+            db.add(t2)
 
-            # Minutes for Meeting 1
-            min1 = models.Minutes(
-                meeting_id=m1.id,
-                summary="The Gram Sabha approved an allocation of INR 3,00,000 for laying clean drinking water pipes under the Jal Jeevan Mission in Rampur East. Standard sanitation inspections were ordered.",
-                topics=["Water Supply", "Sanitation", "Jal Jeevan Mission"],
-                schemes=["Jal Jeevan Mission (JJM)", "Gram Panchayat Development Plan (GPDP)"],
-                budget_summary={"Water Pipeline Extension": 300000.0},
-                digital_hash="da56bc7812ea0f4b986e11122aefc8821948b8cc7e08bbcfdaeeef01bc89a622",
-                approved_by_id=mod_id,
-                approved_at=datetime.utcnow() - timedelta(days=10)
+            min2 = models.Minutes(
+                meeting_id=m2.id,
+                summary="Engineering confirmed database indexing completion and assigned Priya to submit the security audit report by Friday.",
+                topics=[
+                    {"topic": "API Performance & Indexing", "discussion": "Database indexes applied to meetings and action items tables.", "source_segments": ["segment_3"]}
+                ],
+                decisions=[
+                    {"decision": "Proceed with OAuth2 microservice staging deployment", "context": "Confirmed by engineering team.", "source_segments": ["segment_1"]}
+                ],
+                issues_and_risks=[
+                    {"issue": "Staging server capacity", "impact": "Requires additional staging memory.", "source_segments": ["segment_2"]}
+                ],
+                follow_ups=[],
+                financial_information=[],
+                additional_notes="PRs merged into main branch."
             )
-            db.add(min1)
+            db.add(min2)
 
-            # Action Items for Meeting 1
-            act1 = models.ActionItem(
-                meeting_id=m1.id,
-                title="Laying water pipelines in Rampur East",
-                description="Technical estimate preparation and worker assignment for water lines.",
-                responsible_person="Rajesh Kumar (Secretary)",
-                department="Public Works Department",
-                deadline=datetime.now() + timedelta(days=30),
-                status="pending"
+            act2 = models.ActionItem(
+                meeting_id=m2.id,
+                title="Submit security audit compliance report",
+                description="Finalize penetration testing and OAuth2 audit documentation.",
+                owner_user_id=seeded_users["employee1"].id,
+                responsible_person="Priya Mehta",
+                department="Security & Compliance",
+                deadline=datetime.now() + timedelta(days=5),
+                status="pending",
+                source_segments=["segment_2"]
             )
-            db.add(act1)
-
-            # Votes for Meeting 1
-            v1 = models.Vote(
-                meeting_id=m1.id,
-                proposal_title="Sanction INR 3,00,000 for pipeline construction",
-                votes_for=22,
-                votes_against=0,
-                votes_abstain=1,
-                objections_summary="None"
-            )
-            db.add(v1)
+            db.add(act2)
             db.commit()
 
-            # Index inside RAG vector search
             rag_service.add_document(
-                meeting_id=m1.id,
-                title=m1.title,
-                text="The Gram Sabha approved an allocation of INR 3,00,000 for laying clean drinking water pipes under the Jal Jeevan Mission in Rampur East. Standard sanitation inspections were ordered."
+                meeting_id=m2.id,
+                title=m2.title,
+                text="Engineering confirmed database indexing completion and assigned Priya to submit the security audit report by Friday."
             )
-
-        # Meeting 2: Primary School Repair (Scheduled)
-        m2 = db.query(models.Meeting).filter(models.Meeting.title == "Primary School Infrastructure").first()
-        if not m2:
-            m2 = models.Meeting(
-                title="Primary School Infrastructure",
-                description="Discussion on funding allocations for repairing the roof of the Rampur Primary School.",
-                date=datetime.now() + timedelta(days=3),
-                location="Primary School compound",
-                status="scheduled",
-                agenda="1. Roof leakage inspection.\n2. Allocation of funds under Samagra Shiksha.\n3. Appointment of contractor.",
-                qr_code_data="gram_sabha_attendance:meeting_id=2",
-                secretary_id=sec_id
-            )
-            db.add(m2)
-            db.commit()
-            print("Seeded meeting: Primary School Infrastructure")
+            print("Seeded meeting: Core API & Infrastructure Architecture Sync")
 
     except Exception as e:
         db.rollback()

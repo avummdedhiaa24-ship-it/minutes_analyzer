@@ -116,7 +116,20 @@ export const audioApi = {
 
     return apiRequest(`/audio/upload/${meetingId}`, "POST", formData, token, true);
   },
+
+  getTranscript: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/transcript/${meetingId}`, "GET", null, token);
+  },
+
+  updateTranscript: (meetingId: number, transcriptData: { raw_text?: string; diarized_json?: any[] }, token?: string | null) => {
+    return apiRequest(`/audio/transcript/${meetingId}`, "PUT", transcriptData, token);
+  },
+
+  regenerateMinutes: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/transcript/${meetingId}/regenerate-minutes`, "POST", null, token);
+  },
 };
+
 
 // Minutes & finalization
 export const minutesApi = {
@@ -179,6 +192,9 @@ export const translationApi = {
 export const attendanceApi = {
   checkin: (meetingId: number, data: { user_id: number; method: string; gps_lat?: number; gps_lng?: number }, token?: string | null) => {
     return apiRequest(`/attendance/${meetingId}`, "POST", data, token);
+  },
+  getStats: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/attendance/${meetingId}/stats`, "GET", null, token);
   },
   list: (meetingId: number, token?: string | null) => {
     return apiRequest(`/meetings/${meetingId}`, "GET", null, token)

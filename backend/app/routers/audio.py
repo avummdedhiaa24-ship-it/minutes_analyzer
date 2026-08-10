@@ -142,3 +142,126 @@ def stream_audio(
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Audio recording not found")
     return FileResponse(file_path, media_type="audio/mpeg")
+
+@router.get("/transcript/{meeting_id}", response_model=schemas.TranscriptResponse)
+def get_transcript(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    transcript = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found for this meeting.")
+    return transcript
+
+@router.put("/transcript/{meeting_id}", response_model=schemas.TranscriptResponse)
+def update_transcript(
+    meeting_id: int,
+    transcript_in: schemas.TranscriptUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    transcript = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if not transcript:
+        # Create transcript if doesn't exist
+        transcript = models.Transcript(meeting_id=meeting_id, language="en", confidence=1.0)
+        db.add(transcript)
+
+    prev_state = {
+        "raw_text": transcript.raw_text,
+        "diarized_json": transcript.diarized_json
+    }
+
+    if transcript_in.raw_text is not None:
+        transcript.raw_text = transcript_in.raw_text
+    if transcript_in.diarized_json is not None:
+        # Convert schema objects or dicts to JSON list
+        formatted_diarized = []
+        for item in transcript_in.diarized_json:
+            if hasattr(item, "dict"):
+                formatted_diarized.append(item.dict())
+            elif isinstance(item, dict):
+                formatted_diarized.append(item)
+        transcript.diarized_json = formatted_diarized
+
+        # If raw_text wasn't explicitly provided, reconstruct raw_text from diarized segments
+        if transcript_in.raw_text is None and formatted_diarized:
+            transcript.raw_text = " ".join([f"[{seg.get('speaker', 'Speaker')}]: {seg.get('text', '')}" for seg in formatted_diarized])
+
+    current_state = {
+        "raw_text": transcript.raw_text,
+        "diarized_json": transcript.diarized_json
+    }
+
+    # Audit log
+    from app.services.audit import audit_service
+    audit_service.log_change(
+        db=db,
+        meeting_id=meeting_id,
+        modified_by_id=current_user.id,
+        action="edit_transcript",
+        previous_state=prev_state,
+        current_state=current_state
+    )
+
+    db.commit()
+    db.refresh(transcript)
+    return transcript
+
+@router.post("/transcript/{meeting_id}/regenerate-minutes", response_model=schemas.MinutesResponse)
+def regenerate_minutes_from_transcript(
+    meeting_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    transcript = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if not transcript or not transcript.raw_text:
+        raise HTTPException(status_code=400, detail="Transcript is empty or missing. Add transcript content before re-generating minutes.")
+
+    # Re-run AI extraction pipeline on current transcript text
+    nlp_data = ai_pipeline.extract_structured_minutes(transcript.raw_text, transcript.language or "en")
+
+    # Fetch or create Minutes record
+    minutes = db.query(models.Minutes).filter(models.Minutes.meeting_id == meeting_id).first()
+    if not minutes:
+        minutes = models.Minutes(meeting_id=meeting_id)
+        db.add(minutes)
+
+    minutes.summary = nlp_data.get("summary", "")
+    minutes.topics = nlp_data.get("topics", [])
+    minutes.decisions = nlp_data.get("decisions", [])
+    minutes.issues_and_risks = nlp_data.get("issues_and_risks", [])
+    minutes.follow_ups = nlp_data.get("follow_ups", [])
+    minutes.financial_information = nlp_data.get("financial_information", [])
+    minutes.additional_notes = nlp_data.get("additional_notes", "")
+    minutes.version_number = (minutes.version_number or 1) + 1
+
+    # Clear existing action items & populate normalized ActionItem records
+    db.query(models.ActionItem).filter(models.ActionItem.meeting_id == meeting_id).delete()
+
+    for act in nlp_data.get("action_items", []):
+        action_item = models.ActionItem(
+            meeting_id=meeting_id,
+            title=act.get("title", "Action Item"),
+            description=act.get("description", ""),
+            responsible_person=act.get("responsible_person", "Unassigned"),
+            department=act.get("department", "General"),
+            status="pending",
+            source_segments=act.get("source_segments", ["segment_1"])
+        )
+        db.add(action_item)
+
+    # Re-index text into RAG service
+    rag_service.add_document(meeting_id, meeting.title, transcript.raw_text)
+
+    db.commit()
+    db.refresh(minutes)
+    return minutes
+

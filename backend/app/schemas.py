@@ -60,10 +60,12 @@ class AttendanceResponse(BaseModel):
 class ActionItemBase(BaseModel):
     title: str
     description: Optional[str] = None
+    owner_user_id: Optional[int] = None
     responsible_person: Optional[str] = None
     department: Optional[str] = None
     deadline: Optional[datetime] = None
     status: str = "pending"
+    source_segments: Optional[List[str]] = None
 
 class ActionItemCreate(ActionItemBase):
     pass
@@ -95,6 +97,7 @@ class VoteResponse(VoteBase):
 
 # Transcript Schemas
 class TranscriptSegment(BaseModel):
+    id: Optional[str] = None
     speaker: str
     start: float
     end: float
@@ -112,12 +115,20 @@ class TranscriptResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class TranscriptUpdate(BaseModel):
+    raw_text: Optional[str] = None
+    diarized_json: Optional[List[TranscriptSegment]] = None
+
 # Minutes Schemas
 class MinutesBase(BaseModel):
     summary: str
-    topics: List[str]
-    schemes: List[str]
-    budget_summary: Dict[str, Any]
+    topics: Optional[List[Any]] = None
+    decisions: Optional[List[Any]] = None
+    issues_and_risks: Optional[List[Any]] = None
+    follow_ups: Optional[List[Any]] = None
+    financial_information: Optional[List[Any]] = None
+    additional_notes: Optional[str] = None
+    version_number: Optional[int] = 1
 
 class MinutesCreate(MinutesBase):
     pass
@@ -152,8 +163,11 @@ class TranslationResponse(TranslationBase):
 class MeetingBase(BaseModel):
     title: str
     description: Optional[str] = None
+    meeting_type: Optional[str] = "General"
+    department: Optional[str] = "General"
     date: datetime
     location: Optional[str] = None
+    meeting_link: Optional[str] = None
     scheduled_start: Optional[datetime] = None
     agenda: Optional[str] = None
 
@@ -168,6 +182,9 @@ class MeetingResponse(MeetingBase):
     audio_url: Optional[str] = None
     video_url: Optional[str] = None
     secretary_id: Optional[int] = None
+    chairperson_id: Optional[int] = None
+    current_revision: Optional[int] = 1
+    finalized_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:
@@ -175,6 +192,7 @@ class MeetingResponse(MeetingBase):
 
 class MeetingDetailResponse(MeetingResponse):
     secretary: Optional[UserResponse] = None
+    chairperson: Optional[UserResponse] = None
     attendance: List[AttendanceResponse] = []
     transcripts: Optional[TranscriptResponse] = None
     minutes: Optional[MinutesResponse] = None

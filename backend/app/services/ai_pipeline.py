@@ -122,105 +122,13 @@ class AIPipelineService:
 
     def _acoustic_voice_diarization(self, wav_path: str, chunks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        True acoustic speaker diarization using librosa MFCC voice timbre feature extraction
-        and scikit-learn Agglomerative Acoustic Clustering directly on the raw audio signal.
-        Identifies speaker changes by voice timbre, pitch, and acoustic resonance rather than pauses.
+        Diarization dispatch delegate: uses PyAnnote (pyannote/speaker-diarization-3.1)
+        or Legacy MFCC Clustering (when LEGACY_DIARIZATION=true).
         """
-        SPEAKER_ROLE_LABELS = [
-            "Manager",
-            "CEO",
-            "Senior Engineer",
-            "Project Lead",
-            "Product Manager",
-            "Security Officer",
-        ]
-
-        try:
-            import librosa
-            import numpy as np
-            from sklearn.cluster import AgglomerativeClustering
-
-            if not os.path.exists(wav_path):
-                return []
-
-            y, sr = librosa.load(wav_path, sr=16000)
-            if len(y) == 0:
-                return []
-
-            embeddings = []
-            valid_chunks = []
-            prev_end = 0.0
-
-            for chunk in chunks:
-                ts = chunk.get("timestamp", (0.0, None))
-                start_s = ts[0] if ts[0] is not None else prev_end
-                end_s = ts[1] if ts[1] is not None else start_s + 3.0
-                text = chunk.get("text", "").strip()
-                if not text:
-                    prev_end = end_s
-                    continue
-
-                start_idx = int(start_s * sr)
-                end_idx = min(len(y), int(end_s * sr))
-
-                # Extract audio slice for this timestamp
-                if end_idx - start_idx < int(sr * 0.3):
-                    segment = y[max(0, start_idx - int(sr * 0.5)):min(len(y), end_idx + int(sr * 0.5))]
-                else:
-                    segment = y[start_idx:end_idx]
-
-                if len(segment) == 0:
-                    prev_end = end_s
-                    continue
-
-                # Extract 20 MFCC features + standard deviation (vocal acoustic signature)
-                mfcc = librosa.feature.mfcc(y=segment, sr=sr, n_mfcc=20)
-                mfcc_mean = np.mean(mfcc, axis=1)
-                mfcc_std = np.std(mfcc, axis=1)
-                feat = np.hstack([mfcc_mean, mfcc_std])
-
-                embeddings.append(feat)
-                valid_chunks.append({"start": round(start_s, 1), "end": round(end_s, 1), "text": text})
-                prev_end = end_s
-
-            if not embeddings:
-                return []
-
-            embeddings_arr = np.array(embeddings)
-            if len(embeddings_arr) > 1:
-                # Acoustic distance clustering by voice similarity
-                clustering = AgglomerativeClustering(
-                    n_clusters=None,
-                    distance_threshold=28.0,
-                    metric="euclidean",
-                    linkage="ward"
-                )
-                speaker_ids = clustering.fit_predict(embeddings_arr)
-            else:
-                speaker_ids = [0]
-
-            diarized = []
-            for chunk, spk_id in zip(valid_chunks, speaker_ids):
-                role = SPEAKER_ROLE_LABELS[spk_id % len(SPEAKER_ROLE_LABELS)]
-                label = f"Speaker {spk_id + 1} ({role})"
-                
-                # Merge consecutive chunks if same acoustic speaker voice
-                if diarized and diarized[-1]["speaker"] == label and (chunk["start"] - diarized[-1]["end"] < 0.8):
-                    diarized[-1]["text"] += " " + chunk["text"]
-                    diarized[-1]["end"] = chunk["end"]
-                else:
-                    diarized.append({
-                        "speaker": label,
-                        "start": chunk["start"],
-                        "end": chunk["end"],
-                        "text": chunk["text"]
-                    })
-
-            logger.info(f"Acoustic MFCC voice diarization identified {len(set(speaker_ids))} speaker voice(s).")
-            return diarized
-        except Exception as e:
-            logger.warning(f"Acoustic MFCC speaker diarization failed ({e}), falling back to text cues.")
-            return []
+        from app.services.diarization import get_diarization_backend
+        backend = get_diarization_backend()
+        segments = backend.diarize(wav_path, chunks)
+        return [s.to_dict() if hasattr(s, "to_dict") else s for s in segments]
 
     def clean_and_polish_transcript(self, text: str) -> str:
         """

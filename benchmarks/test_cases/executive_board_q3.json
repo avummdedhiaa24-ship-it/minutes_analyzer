@@ -1,0 +1,30 @@
+{
+  "name": "executive_board_q3",
+  "reference_segments": [
+    { "start": 0.0, "end": 25.0, "speaker": "CEO" },
+    { "start": 25.0, "end": 50.0, "speaker": "CFO" },
+    { "start": 50.0, "end": 90.0, "speaker": "Board_Member" }
+  ],
+  "hypothesis_segments": [
+    { "start": 0.0, "end": 24.5, "speaker": "SPEAKER_1" },
+    { "start": 24.5, "end": 49.5, "speaker": "SPEAKER_2" },
+    { "start": 49.5, "end": 90.0, "speaker": "SPEAKER_3" }
+  ],
+  "gold_summary": "The executive board approved $1.2M for overseas expansion and ratified the Q2 audit report.",
+  "hypothesis_summary": "The executive committee reviewed finance & resource budget, security & compliance. Key decisions approved include: Approved direction for Finance & Resource Budget; Approved direction for Security & Compliance.",
+  "transcript": "CEO: We need to finalize the market expansion budget for Q3. CFO: I propose allocating 1.2 million dollars for international operations. Board Member: Agreed, and we also ratify the Q2 financial audit report.",
+  "extracted_claims": [
+    {
+      "text": "Allocated $1.2 million for international market expansion",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Ratified Q2 financial audit report",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Acquired competitor company for 500 million dollars",
+      "is_hallucinated": true
+    }
+  ]
+}

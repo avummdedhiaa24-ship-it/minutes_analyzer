@@ -1,0 +1,30 @@
+{
+  "name": "product_sprint_sync",
+  "reference_segments": [
+    { "start": 0.0, "end": 15.0, "speaker": "Scrum_Master" },
+    { "start": 15.0, "end": 40.0, "speaker": "Frontend_Lead" },
+    { "start": 40.0, "end": 65.0, "speaker": "Backend_Lead" }
+  ],
+  "hypothesis_segments": [
+    { "start": 0.0, "end": 14.8, "speaker": "SPEAKER_A" },
+    { "start": 14.8, "end": 39.5, "speaker": "SPEAKER_B" },
+    { "start": 39.5, "end": 65.0, "speaker": "SPEAKER_C" }
+  ],
+  "gold_summary": "The sprint sync prioritized indexing optimization, resolved UI rendering bottlenecks, and targeted release for Friday.",
+  "hypothesis_summary": "The executive committee reviewed infrastructure & architecture, product strategy. Key decisions approved include: Approved direction for Infrastructure & Architecture; Approved direction for Product Strategy.",
+  "transcript": "Scrum Master: Welcome team to Sprint 42 sync. Frontend Lead: We fixed the dashboard rendering latency. Backend Lead: We completed the indexing optimization and we are targeting Friday deployment.",
+  "extracted_claims": [
+    {
+      "text": "Completed database indexing optimization for Friday deployment",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Resolved frontend dashboard rendering latency issue",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Cancelled all engineering operations until next year",
+      "is_hallucinated": true
+    }
+  ]
+}

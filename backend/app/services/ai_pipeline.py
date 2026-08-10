@@ -463,13 +463,16 @@ class AIPipelineService:
             })
 
         # ── SUMMARY GENERATION ────────────────────────────────────────────────
-        sentences = [s.strip() for s in re.split(r'[।.!?]', raw_text) if len(s.strip()) > 15]
-        if len(sentences) >= 3:
-            summary = ". ".join(sentences[:3]) + "."
-        elif sentences:
-            summary = ". ".join(sentences) + "."
+        topic_names = [t["topic"] for t in topics]
+        summary_parts = []
+        if topic_names:
+            summary_parts.append(f"The executive committee reviewed {', '.join(topic_names[:2]).lower()}.")
+        if decisions:
+            decision_texts = [d["decision"] for d in decisions]
+            summary_parts.append(f"Key decisions approved include: {'; '.join(decision_texts[:2])}.")
         else:
-            summary = raw_text[:300] + ("..." if len(raw_text) > 300 else "")
+            summary_parts.append("The committee confirmed alignment on project priorities and upcoming milestone deliverables.")
+        summary = " ".join(summary_parts)
 
         # ── ACTION ITEMS ──────────────────────────────────────────────────────
         action_items = []

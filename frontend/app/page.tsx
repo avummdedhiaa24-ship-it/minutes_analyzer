@@ -1214,7 +1214,7 @@ function MeetingsPage() {
     }
   };
 
-  const isSecretaryOrAdmin = currentUser?.role === "Secretary" || currentUser?.role === "Admin";
+  const isSecretaryOrAdmin = currentUser?.role === "System Admin" || currentUser?.role === "CEO" || currentUser?.role === "Manager" || currentUser?.role === "Admin" || currentUser?.role === "Secretary";
 
   if (loading) {
     return (

@@ -26,7 +26,7 @@ export default function AuthView({ onAuthSuccess }: AuthViewProps) {
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("Male");
   const [socialCategory, setSocialCategory] = useState("General");
-  const [role, setRole] = useState("Citizen");
+  const [role, setRole] = useState("Manager");
   const [village, setVillage] = useState("");
   const [block, setBlock] = useState("");
   const [district, setDistrict] = useState("");

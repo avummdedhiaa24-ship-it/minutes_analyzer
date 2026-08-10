@@ -195,4 +195,15 @@ def test_audit_chain_verification_tampering():
     assert "valid" in res.json()
     assert res.json()["valid"] is True
 
+def test_rag_chat_ungrounded_query_not_found():
+    chat_req = {
+        "messages": [
+            {"role": "user", "content": "What is the secret launch date of spaceship Mars 999?"}
+        ]
+    }
+    response = client.post("/api/v1/chat", json=chat_req)
+    assert response.status_code == 200
+    assert "No matching resolution found" in response.json()["content"]
+    assert len(response.json()["citations"]) == 0
+
 

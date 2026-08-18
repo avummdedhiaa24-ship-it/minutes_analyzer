@@ -9,7 +9,7 @@ from app.services.ai_pipeline import ai_pipeline
 
 router = APIRouter(prefix="/translation", tags=["Translation"])
 
-officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Gram Sabha Moderator", "District Officer", "State Officer"]
+officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Department Lead", "Director"]
 is_officer = RoleChecker(officer_roles)
 
 def generate_translation_for_meeting(meeting_id: int, lang_code: str, db: Session) -> models.Translation:

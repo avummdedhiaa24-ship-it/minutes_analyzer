@@ -1,0 +1,34 @@
+{
+  "scenario_id": "case_08_interruption",
+  "description": "Speaker A interrupted by Speaker B overlapping speech. Expected: OVERLAP EVENT.",
+  "audio_duration_seconds": 12.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 8.0,
+        "text": "The timeline for the release relies heavily on team bandwidth."
+      },
+      {
+        "speaker": "Speaker 2 (Lead)",
+        "start": 4.5,
+        "end": 7.5,
+        "text": "Wait, let me clarify the bandwidth constraint.",
+        "overlapping": true,
+        "primary_speaker": "Speaker 1 (Manager)",
+        "secondary_speaker": "Speaker 2 (Lead)"
+      }
+    ],
+    "speaker_changes": [],
+    "overlaps": [
+      {
+        "start": 4.5,
+        "end": 7.5,
+        "primary_speaker": "Speaker 1 (Manager)",
+        "secondary_speaker": "Speaker 2 (Lead)",
+        "confidence": 0.88
+      }
+    ]
+  }
+}

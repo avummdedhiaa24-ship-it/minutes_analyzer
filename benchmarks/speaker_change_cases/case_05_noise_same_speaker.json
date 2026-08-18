@@ -1,0 +1,23 @@
+{
+  "scenario_id": "case_05_noise_same_speaker",
+  "description": "Speaker A speaks -> background door noise -> Speaker A continues. Expected: NO SPEAKER CHANGE.",
+  "audio_duration_seconds": 12.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 5.0,
+        "text": "We will finalize the product roadmap tomorrow."
+      },
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 7.0,
+        "end": 12.0,
+        "text": "Please ensure all engineering leads attend."
+      }
+    ],
+    "speaker_changes": [],
+    "overlaps": []
+  }
+}

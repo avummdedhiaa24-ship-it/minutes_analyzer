@@ -4,10 +4,15 @@ import os
 
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.seed_data import seed_db
 from app.routers import auth, meetings, attendance, audio, minutes, translation, chat, search, analytics, audit
 
-# Initialize database schemas
+# Initialize database schemas & seed initial corporate accounts
 Base.metadata.create_all(bind=engine)
+try:
+    seed_db()
+except Exception as e:
+    print(f"Seed DB warning: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

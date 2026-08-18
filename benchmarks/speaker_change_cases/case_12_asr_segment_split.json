@@ -1,0 +1,37 @@
+{
+  "scenario_id": "case_12_asr_segment_split",
+  "description": "Single Whisper ASR chunk containing speech from Speaker A and Speaker B. Expected: ASR SPLIT AT SPEAKER CHANGE BOUNDARY.",
+  "audio_duration_seconds": 10.0,
+  "ground_truth": {
+    "asr_raw_chunks": [
+      {
+        "timestamp": [0.0, 8.0],
+        "text": "We should approve the infrastructure proposal and I agree with that suggestion completely."
+      }
+    ],
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 4.0,
+        "text": "We should approve the infrastructure proposal and"
+      },
+      {
+        "speaker": "Speaker 2 (Architect)",
+        "start": 4.0,
+        "end": 8.0,
+        "text": "I agree with that suggestion completely."
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 4.0,
+        "from_speaker": "Speaker 1 (Manager)",
+        "to_speaker": "Speaker 2 (Architect)",
+        "confidence": 0.94,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

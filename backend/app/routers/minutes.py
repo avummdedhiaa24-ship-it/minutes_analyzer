@@ -12,7 +12,7 @@ from app.services.ai_pipeline import ai_pipeline
 
 router = APIRouter(prefix="/minutes", tags=["Minutes & Human Review"])
 
-officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Gram Sabha Moderator", "District Officer", "State Officer"]
+officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Department Lead", "Director"]
 is_officer = RoleChecker(officer_roles)
 
 @router.get("/{meeting_id}", response_model=schemas.MinutesResponse)

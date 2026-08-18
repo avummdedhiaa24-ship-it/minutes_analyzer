@@ -1,0 +1,44 @@
+{
+  "scenario_id": "case_03_three_speakers",
+  "description": "Speaker A -> Speaker B -> Speaker C sequential transition",
+  "audio_duration_seconds": 18.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Host)",
+        "start": 0.0,
+        "end": 6.0,
+        "text": "Welcome everyone to the monthly architecture sync."
+      },
+      {
+        "speaker": "Speaker 2 (Backend Lead)",
+        "start": 6.0,
+        "end": 12.0,
+        "text": "I will present the database partitioning strategy."
+      },
+      {
+        "speaker": "Speaker 3 (Security Officer)",
+        "start": 12.0,
+        "end": 18.0,
+        "text": "Make sure all data at rest is encrypted with AES-256."
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 6.0,
+        "from_speaker": "Speaker 1 (Host)",
+        "to_speaker": "Speaker 2 (Backend Lead)",
+        "confidence": 1.0,
+        "classification": "CONFIRMED"
+      },
+      {
+        "timestamp": 12.0,
+        "from_speaker": "Speaker 2 (Backend Lead)",
+        "to_speaker": "Speaker 3 (Security Officer)",
+        "confidence": 1.0,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

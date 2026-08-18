@@ -206,4 +206,83 @@ def test_rag_chat_ungrounded_query_not_found():
     assert "No matching resolution found" in response.json()["content"]
     assert len(response.json()["citations"]) == 0
 
+def test_live_recording_lifecycle_and_chunk_transport():
+    # 1. Signup and Create Meeting
+    client.post("/api/v1/auth/signup", json={"username": "rec_admin", "email": "rec@corp.com", "role": "System Admin", "password": "pass"})
+    login_res = client.post("/api/v1/auth/login", data={"username": "rec_admin", "password": "pass"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    meet_res = client.post("/api/v1/meetings", json={"title": "Q3 Executive Strategy Sync", "date": "2026-08-16T10:00:00", "enable_recording": True, "authorization_confirmed": True}, headers=headers)
+    meet_id = meet_res.json()["id"]
+
+    # 2. Start Recording requiring authorization
+    start_unauth = client.post(f"/api/v1/audio/recording/{meet_id}/start", json={"authorization_confirmed": False}, headers=headers)
+    assert start_unauth.status_code == 400
+
+    start_res = client.post(f"/api/v1/audio/recording/{meet_id}/start", json={"authorization_confirmed": True}, headers=headers)
+    assert start_res.status_code == 200
+    assert start_res.json()["recording_status"] == "recording"
+    assert start_res.json()["authorization_confirmed"] is True
+
+    # 3. Pause & Resume Recording
+    pause_res = client.post(f"/api/v1/audio/recording/{meet_id}/pause", headers=headers)
+    assert pause_res.status_code == 200
+    assert pause_res.json()["recording_status"] == "paused"
+
+    resume_res = client.post(f"/api/v1/audio/recording/{meet_id}/resume", headers=headers)
+    assert resume_res.status_code == 200
+    assert resume_res.json()["recording_status"] == "recording"
+
+    # 4. Stream Upload Audio Chunks with Sequence & Checksum
+    chunk1_data = b"RIFF....WAVEfmt ....data...."
+    files1 = {
+        "sequence_number": (None, "1"),
+        "checksum": (None, "sha256_dummy_1"),
+        "chunk_file": ("chunk_00001.webm", chunk1_data, "audio/webm")
+    }
+    chunk1_res = client.post(f"/api/v1/audio/recording/{meet_id}/stream", files=files1, headers=headers)
+    assert chunk1_res.status_code == 200
+    assert chunk1_res.json()["status"] == "acknowledged"
+    assert chunk1_res.json()["received_total_chunks"] == 1
+
+    # Duplicate Chunk Duplicate Handling
+    dup_res = client.post(f"/api/v1/audio/recording/{meet_id}/stream", files=files1, headers=headers)
+    assert dup_res.status_code == 200
+    assert dup_res.json()["status"] == "duplicate_acknowledged"
+
+    # 5. Create Meeting Moment Marker
+    marker_req = {"label": "Decision", "timestamp_seconds": 12.5, "note": "Approved Q4 budget extension"}
+    marker_res = client.post(f"/api/v1/audio/markers/{meet_id}", json=marker_req, headers=headers)
+    assert marker_res.status_code == 200
+    assert marker_res.json()["label"] == "Decision"
+
+    markers_list = client.get(f"/api/v1/audio/markers/{meet_id}")
+    assert markers_list.status_code == 200
+    assert len(markers_list.json()) == 1
+
+    # 6. Stop Recording & Verify Processing Pipeline State
+    stop_res = client.post(f"/api/v1/audio/recording/{meet_id}/stop", headers=headers)
+    assert stop_res.status_code == 200
+    assert stop_res.json()["meeting_status"] == "processing"
+
+    proc_status = client.get(f"/api/v1/audio/processing/{meet_id}/status")
+    assert proc_status.status_code == 200
+    assert "current_stage" in proc_status.json()
+
+def test_idempotent_processing_failure_recovery():
+    client.post("/api/v1/auth/signup", json={"username": "retry_mgr", "email": "retry@corp.com", "role": "Manager", "password": "pass"})
+    login_res = client.post("/api/v1/auth/login", data={"username": "retry_mgr", "password": "pass"})
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    meet_res = client.post("/api/v1/meetings", json={"title": "Retry Pipeline Test", "date": "2026-08-16T11:00:00"}, headers=headers)
+    meet_id = meet_res.json()["id"]
+
+    # Trigger retry
+    retry_res = client.post(f"/api/v1/audio/processing/{meet_id}/retry", headers=headers)
+    assert retry_res.status_code == 200
+    assert retry_res.json()["meeting_status"] == "processing"
+
+
 

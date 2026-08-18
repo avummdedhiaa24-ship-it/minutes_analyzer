@@ -226,7 +226,20 @@ export const UI_TRANSLATIONS: Record<string, Record<LanguageCode, string>> = {
     hi: "वर्तमान स्थिति का सारांश",
     mr: "सध्याच्या स्थितीचा सारांश",
     te: "ప్రస్తుत స్థితి సారాంశం"
-  }
+  },
+  // Live Meeting Recording & Controls
+  "Recording Permission Required": { en: "Recording Permission Required", hi: "रिकॉर्डिंग अनुमति आवश्यक है", mr: "रेकॉर्डिंग परवानगी आवश्यक आहे", te: "రికార్డింగ్ అనుమతి అవసరం" },
+  "Start Meeting Recording": { en: "Start Meeting Recording", hi: "बैठक रिकॉर्डिंग शुरू करें", mr: "बैठक रेकॉर्डिंग सुरू करा", te: "సమావేశ రికార్డింగ్‌ను ప్రారంభించండి" },
+  "Pause Recording": { en: "Pause Recording", hi: "रिकॉर्डिंग रोकें", mr: "रेकॉर्डिंग थांबवा", te: "రికార్డింగ్‌ను పాజ్ చేయండి" },
+  "Resume Recording": { en: "Resume Recording", hi: "रिकॉर्डिंग पुनः प्रारंभ करें", mr: "रेकॉर्डिंग पुन्हा सुरू करा", te: "రికార్డింగ్‌ను పునఃప్రారంభించండి" },
+  "End Meeting": { en: "End Meeting", hi: "बैठक समाप्त करें", mr: "बैठक समाप्त करा", te: "సమావేశాన్ని ముగించండి" },
+  "End Meeting & Generate Minutes": { en: "End Meeting & Generate Minutes", hi: "बैठक समाप्त करें और कार्यवृत्त बनाएं", mr: "बैठक समाप्त करा आणि इतिवृत्त तयार करा", te: "సమావేశాన్ని ముగించి నిమిషాలను రూపొందించండి" },
+  "RECORDING": { en: "RECORDING", hi: "रिकॉर्डिंग जारी", mr: "रेकॉर्डिंग सुरू आहे", te: "రికార్డింగ్ జరుగుతోంది" },
+  "Recording Paused": { en: "Recording Paused", hi: "रिकॉर्डिंग रुकी हुई है", mr: "रेकॉर्डिंग थांबवले आहे", te: "రికార్డింగ్ పాజ్ చేయబడింది" },
+  "Mark Moment": { en: "Mark Moment", hi: "महत्वपूर्ण क्षण अंकित करें", mr: "महत्त्वाचा क्षण चिन्हांकित करा", te: "ముఖ్యమైన క్షణాన్ని గుర్తించండి" },
+  "Minutes Ready for Review": { en: "Minutes Ready for Review", hi: "समीक्षा के लिए कार्यवृत्त तैयार है", mr: "आढाव्यासाठी इतिवृत्त तयार आहे", te: "సమీక్ష కోసం నిమిషాలు సిద్ధంగా ఉన్నాయి" },
+  "Retry Processing": { en: "Retry Processing", hi: "पुनः प्रयास करें", mr: "पुन्हा प्रयत्न करा", te: "మళ్లీ ప్రయత్నించండి" },
+  "Live Meeting Workspace": { en: "Live Meeting Workspace", hi: "लाइव बैठक कार्यक्षेत्र", mr: "थेट बैठक कार्यक्षेत्र", te: "లైవ్ సమావేశ వర్క్‌స్పేస్" },
 };
 
 export function useTranslation() {

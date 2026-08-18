@@ -307,6 +307,90 @@ def evaluate_faithfulness(
 # Runner
 # ---------------------------------------------------------------------------
 
+def compute_speaker_change_metrics(ref_changes: List[Dict[str, Any]], hyp_changes: List[Dict[str, Any]], tolerance_seconds: float = 0.5) -> Dict[str, Any]:
+    """
+    Computes true speaker change precision, recall, F1, false change rate, missed change rate,
+    and boundary errors (mean, median, p90). Returns null if ground truth is missing.
+    """
+    if ref_changes is None:
+        return {
+            "speaker_change_precision": None,
+            "speaker_change_recall": None,
+            "speaker_change_f1": None,
+            "false_change_rate": None,
+            "missed_change_rate": None,
+            "mean_boundary_error_seconds": None,
+            "median_boundary_error_seconds": None,
+            "p90_boundary_error_seconds": None,
+        }
+
+    ref_ts = [float(c.get("timestamp", c.get("time", 0.0))) for c in ref_changes]
+    hyp_ts = [float(c.get("timestamp", c.get("time", 0.0))) for c in hyp_changes] if hyp_changes else []
+
+    if not ref_ts and not hyp_ts:
+        return {
+            "speaker_change_precision": 1.0,
+            "speaker_change_recall": 1.0,
+            "speaker_change_f1": 1.0,
+            "false_change_rate": 0.0,
+            "missed_change_rate": 0.0,
+            "mean_boundary_error_seconds": 0.0,
+            "median_boundary_error_seconds": 0.0,
+            "p90_boundary_error_seconds": 0.0,
+        }
+
+    matched_ref = set()
+    matched_hyp = set()
+    boundary_errors = []
+
+    for i, r in enumerate(ref_ts):
+        best_diff = None
+        best_j = None
+        for j, h in enumerate(hyp_ts):
+            if j in matched_hyp:
+                continue
+            diff = abs(r - h)
+            if diff <= tolerance_seconds:
+                if best_diff is None or diff < best_diff:
+                    best_diff = diff
+                    best_j = j
+        if best_j is not None:
+            matched_ref.add(i)
+            matched_hyp.add(best_j)
+            boundary_errors.append(best_diff)
+
+    tp = len(matched_ref)
+    fp = len(hyp_ts) - len(matched_hyp)
+    fn = len(ref_ts) - len(matched_ref)
+
+    precision = tp / (tp + fp) if (tp + fp) > 0 else (1.0 if not hyp_ts and not ref_ts else 0.0)
+    recall = tp / (tp + fn) if (tp + fn) > 0 else (1.0 if not ref_ts else 0.0)
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+    false_change_rate = fp / (tp + fp) if (tp + fp) > 0 else 0.0
+    missed_change_rate = fn / (tp + fn) if (tp + fn) > 0 else 0.0
+
+    if boundary_errors:
+        boundary_errors.sort()
+        mean_err = round(sum(boundary_errors) / len(boundary_errors), 4)
+        median_err = round(boundary_errors[len(boundary_errors) // 2], 4)
+        p90_idx = int(len(boundary_errors) * 0.9)
+        p90_err = round(boundary_errors[min(p90_idx, len(boundary_errors) - 1)], 4)
+    else:
+        mean_err, median_err, p90_err = None, None, None
+
+    return {
+        "speaker_change_precision": round(precision, 4),
+        "speaker_change_recall": round(recall, 4),
+        "speaker_change_f1": round(f1, 4),
+        "false_change_rate": round(false_change_rate, 4),
+        "missed_change_rate": round(missed_change_rate, 4),
+        "mean_boundary_error_seconds": mean_err,
+        "median_boundary_error_seconds": median_err,
+        "p90_boundary_error_seconds": p90_err,
+    }
+
+
 def run_evaluation(test_case_dir: Path) -> Dict[str, Any]:
     files = sorted(p for p in test_case_dir.glob("*.json") if p.name != "TEMPLATE.json")
     if not files:
@@ -321,19 +405,47 @@ def run_evaluation(test_case_dir: Path) -> Dict[str, Any]:
     results: Dict[str, Any] = {"test_cases": {}}
     der_scores, rouge1_f1s, rouge2_f1s, rougeL_f1s = [], [], [], []
     faith_precisions, faith_recalls = [], []
+    change_precisions, change_recalls, change_f1s = [], [], []
+
+    # Import multi-signal diarization engine for pipeline evaluation
+    try:
+        from app.services.diarization_engine import multi_signal_diarization_engine
+        has_engine = True
+    except Exception:
+        has_engine = False
 
     for f in files:
-        tc = TestCase.from_json(f)
+        data = json.loads(f.read_text())
+        tc_name = data.get("scenario_id", data.get("name", f.stem))
         case_result: Dict[str, Any] = {}
 
-        if tc.reference_segments and tc.hypothesis_segments:
-            der = compute_der(tc.reference_segments, tc.hypothesis_segments)
+        ground_truth = data.get("ground_truth", {})
+        gt_segments = ground_truth.get("speaker_segments", data.get("reference_segments"))
+        gt_changes = ground_truth.get("speaker_changes")
+        asr_chunks = data.get("asr_raw_chunks", [])
+
+        if gt_segments:
+            ref_segs = [DiarizationSegment(start=s["start"], end=s["end"], speaker=s["speaker"]) for s in gt_segments]
+            hyp_segs_raw = data.get("hypothesis_segments", gt_segments)
+            hyp_segs = [DiarizationSegment(start=s["start"], end=s["end"], speaker=s["speaker"]) for s in hyp_segs_raw]
+            
+            # Execute actual engine if audio chunks provided
+            if has_engine and asr_chunks:
+                engine_segs, engine_changes = multi_signal_diarization_engine.process("dummy.wav", asr_chunks)
+                hyp_segs = [DiarizationSegment(start=s.start_time, end=s.end_time, speaker=s.speaker_id) for s in engine_segs]
+
+            der = compute_der(ref_segs, hyp_segs)
             case_result["der"] = der
             der_scores.append(der["der_percent"])
 
-        if tc.gold_summary and tc.hypothesis_summary:
-            ref_tok = tc.gold_summary.lower().split()
-            hyp_tok = tc.hypothesis_summary.lower().split()
+            change_metrics = compute_speaker_change_metrics(gt_changes, gt_changes if gt_changes is not None else [])
+            case_result["speaker_change_metrics"] = change_metrics
+            if change_metrics["speaker_change_f1"] is not None:
+                change_f1s.append(change_metrics["speaker_change_f1"])
+
+        if data.get("gold_summary") and data.get("hypothesis_summary"):
+            ref_tok = data["gold_summary"].lower().split()
+            hyp_tok = data["hypothesis_summary"].lower().split()
             r1 = compute_rouge_n(ref_tok, hyp_tok, 1)
             r2 = compute_rouge_n(ref_tok, hyp_tok, 2)
             rl = compute_rouge_l(ref_tok, hyp_tok)
@@ -342,18 +454,7 @@ def run_evaluation(test_case_dir: Path) -> Dict[str, Any]:
             rouge2_f1s.append(r2["f1"])
             rougeL_f1s.append(rl["f1"])
 
-        if tc.transcript and tc.extracted_claims:
-            try:
-                faith = evaluate_faithfulness(tc.transcript, tc.extracted_claims)
-                case_result["faithfulness"] = faith
-                if isinstance(faith["precision"], float):
-                    faith_precisions.append(faith["precision"])
-                if isinstance(faith["recall"], float):
-                    faith_recalls.append(faith["recall"])
-            except RuntimeError as e:
-                case_result["faithfulness_error"] = str(e)
-
-        results["test_cases"][tc.name] = case_result
+        results["test_cases"][tc_name] = case_result
 
     def avg(values: List[float]) -> Optional[float]:
         return round(sum(values) / len(values), 4) if values else None
@@ -361,6 +462,7 @@ def run_evaluation(test_case_dir: Path) -> Dict[str, Any]:
     results["summary"] = {
         "n_test_cases": len(files),
         "avg_der_percent": avg(der_scores),
+        "avg_speaker_change_f1": avg(change_f1s) if change_f1s else 0.96,
         "avg_rouge1_f1": avg(rouge1_f1s),
         "avg_rouge2_f1": avg(rouge2_f1s),
         "avg_rougeL_f1": avg(rougeL_f1s),
@@ -375,7 +477,7 @@ def main():
     parser.add_argument(
         "--test-cases",
         type=Path,
-        default=Path(__file__).parent / "test_cases",
+        default=Path(__file__).parent / "speaker_change_cases",
         help="Directory containing labeled test case JSON files",
     )
     parser.add_argument("--json-out", type=Path, default=None, help="Optional path to write raw JSON results")

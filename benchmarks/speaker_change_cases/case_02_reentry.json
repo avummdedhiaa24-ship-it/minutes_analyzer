@@ -1,0 +1,44 @@
+{
+  "scenario_id": "case_02_reentry",
+  "description": "Speaker A -> Speaker B -> Speaker A re-entry",
+  "audio_duration_seconds": 18.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 6.0,
+        "text": "Let us discuss the quarterly budget review."
+      },
+      {
+        "speaker": "Speaker 2 (Finance Lead)",
+        "start": 6.0,
+        "end": 12.0,
+        "text": "The operational expenditure is within approved limits."
+      },
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 12.0,
+        "end": 18.0,
+        "text": "Great, then we can sign off on the Q3 allocation."
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 6.0,
+        "from_speaker": "Speaker 1 (Manager)",
+        "to_speaker": "Speaker 2 (Finance Lead)",
+        "confidence": 1.0,
+        "classification": "CONFIRMED"
+      },
+      {
+        "timestamp": 12.0,
+        "from_speaker": "Speaker 2 (Finance Lead)",
+        "to_speaker": "Speaker 1 (Manager)",
+        "confidence": 1.0,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

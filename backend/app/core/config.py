@@ -28,6 +28,24 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     HUGGINGFACE_API_KEY: str = os.getenv("HUGGINGFACE_API_KEY", "")
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    # Diarization & Speaker Change Detection Settings
+    DIARIZATION_CONFIG: dict = {
+        "window_seconds": 2.0,
+        "stride_seconds": 0.5,
+        "min_speech_seconds": 0.25,
+        "min_turn_seconds": 0.35,
+        "max_merge_gap_seconds": 1.0,
+        "change_confirmation_windows": 2,
+        "embedding_weight": 0.35,
+        "acoustic_weight": 0.20,
+        "vad_weight": 0.15,
+        "energy_weight": 0.10,
+        "cluster_weight": 0.10,
+        "temporal_weight": 0.10,
+        "adaptive_threshold_enabled": True,
+        "overlap_detection_enabled": True,
+        "max_speakers": 10,
+    }
 
     # Bhashini Government Indic AI Settings
     BHASHINI_USER_ID: str = os.getenv("BHASHINI_USER_ID", "")

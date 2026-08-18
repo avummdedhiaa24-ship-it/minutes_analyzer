@@ -1,0 +1,25 @@
+{
+  "scenario_id": "case_10_similar_voices",
+  "description": "Two speakers with similar acoustic characteristics (similar pitch & pitch contour). Expected: NO UNNECESSARY MERGING.",
+  "audio_duration_seconds": 16.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Dev A)",
+        "start": 0.0,
+        "end": 8.0,
+        "text": "I am reviewing the microservices pull request."
+      },
+      {
+        "speaker": "Speaker 2 (Dev B)",
+        "start": 8.0,
+        "end": 16.0,
+        "text": "I pushed the updated unit tests for the authentication handler."
+      }
+    ],
+    "speaker_changes": [
+      { "timestamp": 8.0, "from_speaker": "Speaker 1 (Dev A)", "to_speaker": "Speaker 2 (Dev B)", "confidence": 0.86 }
+    ],
+    "overlaps": []
+  }
+}

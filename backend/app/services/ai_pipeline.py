@@ -185,15 +185,18 @@ class AIPipelineService:
 
     def diarize_and_transcribe(self, file_path: str, language: str) -> Tuple[str, List[Dict[str, Any]]]:
         """
-        Real local ASR transcription using openai/whisper-small + Acoustic Voice Diarization.
+        Real local ASR transcription using openai/whisper-small + Multi-Signal Diarization Engine.
         Always transcribes the actual audio file uploaded by the user.
         """
-        logger.info(f"Running local Whisper ASR on {file_path} (lang={language})")
+        logger.info(f"Running local Whisper ASR and Multi-Signal Diarization on {file_path} (lang={language})")
+        from app.services.audio_preprocessor import audio_preprocessor
+        from app.services.diarization_engine import multi_signal_diarization_engine
+        from app.services.asr_aligner import asr_aligner
 
-        # ── REAL ASR PATH ──────────────────────────────────────────────────────
+        # ── REAL ASR + DIARIZATION PIPELINE ──────────────────────────────────────
         try:
             if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-                effective_audio_path = self._convert_to_wav(file_path)
+                effective_audio_path, audio_meta = audio_preprocessor.preprocess(file_path)
 
                 # Primary: Bhashini Government ASR API if configured
                 bhashini_raw = None
@@ -215,62 +218,27 @@ class AIPipelineService:
                         chunks = result.get("chunks", [])
 
                     if raw_text:
-                        # 1. Primary: True Acoustic MFCC Voice Clustering
-                        diarized = self._acoustic_voice_diarization(effective_audio_path, chunks)
+                        # 1. Multi-Signal Diarization Engine
+                        diarized_segments_detail, change_events = multi_signal_diarization_engine.process(effective_audio_path, chunks)
+                        diarized_dicts = [s.to_dict() for s in diarized_segments_detail]
 
-                        # 2. Secondary fallback if acoustic features returned single segment
-                        if (not diarized or len(diarized) <= 1) and raw_text:
-                            SPEAKER_ROLE_LABELS = [
-                                "Manager",
-                                "CEO",
-                                "Senior Engineer",
-                                "Project Lead",
-                                "Product Manager",
-                                "Security Officer",
-                            ]
-                            SPEAKER_SHIFT_CUES = [
-                                r"\bfirst topic\b", r"\bsecond topic\b", r"\bthird topic\b", r"\bfourth topic\b",
-                                r"\bmy name is\b", r"\bi am\b", r"\bwe propose\b", r"\bsecretary\b", r"\bsarpanch\b",
-                                r"\bproposal for\b", r"\ball members\b", r"\bthank you\b", r"\bvote\b", r"\bapproved\b",
-                                r"\bshyam\b", r"\bengineer\b", r"\bnow\b", r"\bokay\b", r"\bi am thinking\b",
-                                r"\bso for this\b", r"\bnamaskar\b", r"\bcharcha\b", r"\bbudget\b"
-                            ]
+                        # 2. Word-Level ASR Alignment
+                        aligned_diarized = asr_aligner.align(chunks, diarized_dicts) if chunks else diarized_dicts
 
-                            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', raw_text) if len(s.strip()) > 5]
-                            if len(sentences) > 1:
-                                diarized = []
-                                spk_idx = 0
-                                est_duration = max(30.0, len(raw_text.split()) * 0.4)
-                                for i, sent in enumerate(sentences):
-                                    s_lower = sent.lower()
-                                    has_cue = any(re.search(cue, s_lower) for cue in SPEAKER_SHIFT_CUES)
-                                    if diarized and (has_cue or i % 2 == 1 or sent.endswith('?')):
-                                        spk_idx += 1
-                                    role = SPEAKER_ROLE_LABELS[spk_idx % len(SPEAKER_ROLE_LABELS)]
-                                    speaker_label = f"Speaker {spk_idx + 1} ({role})"
-                                    start_t = round((i / len(sentences)) * est_duration, 1)
-                                    end_t = round(((i + 1) / len(sentences)) * est_duration, 1)
-                                    diarized.append({
-                                        "speaker": speaker_label,
-                                        "start": start_t,
-                                        "end": end_t,
-                                        "text": sent
-                                    })
-
-                        if not diarized and raw_text:
-                            diarized = [{
-                                "speaker": "Speaker 1 (Secretary)",
+                        if not aligned_diarized and raw_text:
+                            aligned_diarized = [{
+                                "speaker": "Speaker 1 (Manager)",
                                 "start": 0.0,
                                 "end": 30.0,
                                 "text": raw_text
                             }]
 
-                        # Post-process & polish transcript text to remove fillers and fix grammar
-                        for seg in diarized:
+                        # Post-process & polish transcript text
+                        for seg in aligned_diarized:
                             seg["text"] = self.clean_and_polish_transcript(seg["text"])
 
-                        logger.info(f"Whisper transcription & acoustic diarization successful: {len(diarized)} segment(s)")
-                        return raw_text, diarized
+                        logger.info(f"Multi-Signal Diarization & Word Alignment successful: {len(aligned_diarized)} segment(s)")
+                        return raw_text, aligned_diarized
         except Exception as e:
             logger.error(f"Local ASR transcription failed: {e}")
 
@@ -278,23 +246,23 @@ class AIPipelineService:
         logger.warning("Falling back to illustrative sample transcript data.")
         if language == "hi":
             diarized = [
-                {"speaker": "Speaker 1 (Secretary)", "start": 0.0, "end": 12.5,
-                 "text": "नमस्कार सभी ग्राम वासियों को। आज की ग्राम सभा बैठक में आप सभी का स्वागत है। आज का मुख्य एजेंडा गांव की सड़कों की मरम्मत और स्वच्छ भारत अभियान के तहत नए शौचालयों का निर्माण है।"},
-                {"speaker": "Speaker 2 (Citizen - Ram Singh)", "start": 13.0, "end": 28.2,
-                 "text": "सचिव जी, हमारे वार्ड नंबर ३ की सड़क बहुत खराब है। बरसात में वहां पानी भर जाता है। हमें जल्द से जल्द सड़क निर्माण की आवश्यकता है।"},
-                {"speaker": "Speaker 3 (Moderator - Sarpanch)", "start": 29.0, "end": 45.0,
-                 "text": "राम सिंह जी, आपका प्रस्ताव बिल्कुल सही है। सड़क मरम्मत के लिए ५ लाख रुपये का बजट आवंटित किया जाता है।"},
-                {"speaker": "Speaker 4 (All Citizens)", "start": 45.5, "end": 50.0,
-                 "text": "हां, हम सब सहमत हैं। सड़क बननी चाहिए।"},
+                {"speaker": "Speaker 1 (Meeting Host)", "start": 0.0, "end": 12.5,
+                 "text": "नमस्कार आप सभी का। आज की कॉर्पोरेट रणनीति बैठक में आपका स्वागत है। आज का मुख्य एजेंडा सिस्टम प्रदर्शन और उत्पाद रिलीज़ है।"},
+                {"speaker": "Speaker 2 (Participant - Ram Singh)", "start": 13.0, "end": 28.2,
+                 "text": "टीम, हमारे एपीआई माइग्रेशन चरण ३ का परीक्षण पूरा हो गया है। हमें जल्द से जल्द प्रोडक्शन परिनियोजन की आवश्यकता है।"},
+                {"speaker": "Speaker 3 (Chairperson)", "start": 29.0, "end": 45.0,
+                 "text": "राम सिंह जी, आपका प्रस्ताव बिल्कुल सही है। क्लाउड इंफ्रास्ट्रक्चर के लिए ५ लाख रुपये का बजट आवंटित किया जाता है।"},
+                {"speaker": "Speaker 4 (All Members)", "start": 45.5, "end": 50.0,
+                 "text": "हां, हम सब सहमत हैं। परिनियोजन होना चाहिए।"},
             ]
         elif language == "mr":
             diarized = [
-                {"speaker": "Speaker 1 (Secretary)", "start": 0.0, "end": 10.0,
-                 "text": "नमस्कार, ग्रामसभा बैठकीत सर्वांचे स्वागत आहे. आजचा मुख्य विषय म्हणजे पिण्याच्या पाण्याची सोय आणि शाळा दुरुस्ती."},
-                {"speaker": "Speaker 2 (Citizen)", "start": 10.5, "end": 22.0,
-                 "text": "सरपंच साहेब, विहिरीचे पाणी दूषित झाले आहे. जलजीवन मिशन अंतर्गत पाइपलाइन लवकरात लवकर पूर्ण करावी."},
-                {"speaker": "Speaker 3 (Sarpanch)", "start": 22.5, "end": 35.0,
-                 "text": "नक्कीच, या योजनेसाठी ३ लाख रुपयांचा निधी मंजूर करण्यात आला आहे. पुढील महिन्यापर्यंत काम पूर्ण होईल."},
+                {"speaker": "Speaker 1 (Meeting Host)", "start": 0.0, "end": 10.0,
+                 "text": "नमस्कार, आजच्या बैठकीत सर्वांचे स्वागत आहे. आजचा मुख्य विषय म्हणजे क्लाउड मायग्रेशन आणि सुरक्षा ऑडिट."},
+                {"speaker": "Speaker 2 (Participant)", "start": 10.5, "end": 22.0,
+                 "text": "अध्यक्ष महोदय, एपीआई परफॉर्मन्स टेस्ट यशस्वी झाली आहे. पुढील महिन्यापर्यंत काम पूर्ण होईल."},
+                {"speaker": "Speaker 3 (Chairperson)", "start": 22.5, "end": 35.0,
+                 "text": "नक्कीच, या योजनेसाठी ३ लाख रुपयांचा निधी मंजूर करण्यात आला आहे."},
             ]
         else:  # English / Default
             diarized = [
@@ -582,10 +550,10 @@ class AIPipelineService:
                 "hi": "नमस्कार सभी ग्राम वासियों को"
             },
             "आज की ग्राम सभा बैठक में आप सभी का स्वागत है": {
-                "en": "Welcome to today's Gram Sabha meeting",
-                "mr": "आजच्या ग्रामसभा बैठकीत तुम्हा सर्वांचे स्वागत आहे",
-                "te": "ఈరోజు గ్రామా సభ సమావేశానికి స్వాగతం",
-                "hi": "आज की ग्राम सभा बैठक में आप सभी का स्वागत है"
+                "en": "Welcome to today's executive board meeting",
+                "mr": "आजच्या कार्यकारी मंडळाच्या बैठकीत तुम्हा सर्वांचे स्वागत आहे",
+                "te": "నేటి ఎగ్జిక్యూటివ్ బోర్డు సమావేశానికి అందరికీ స్వాగతం",
+                "hi": "आज की कार्यकारी बोर्ड बैठक में आप सभी का स्वागत है"
             },
             "आज का मुख्य एजेंडा गांव की सड़कों की मरम्मत और स्वच्छ भारत अभियान के तहत नए शौचालयों का निर्माण है": {
                 "en": "Today's main agenda is the repair of village roads and construction of new toilets under the Swachh Bharat Abhiyan",
@@ -668,10 +636,10 @@ class AIPipelineService:
 
             # --- Hindi Sentences ---
             "नमस्कार सभी ग्राम वासियों को। आज की ग्राम सभा बैठक में आप सभी का स्वागत है। आज का मुख्य एजेंडा गांव की सड़कों की मरम्मत और स्वच्छ भारत अभियान के तहत नए शौचालयों का निर्माण है।": {
-                "en": "Hello to all villagers. Welcome to today's Gram Sabha meeting. Today's main agenda is the repair of village roads and construction of new toilets under the Swachh Bharat Abhiyan.",
-                "mr": "सर्व ग्रामस्थांना नमस्कार. आजच्या ग्रामसभा बैठकीत तुम्हा सर्वांचे स्वागत आहे. आजचा मुख्य अजेंडा गावातील रस्त्यांची दुरुस्ती आणि स्वच्छ भारत अभियानांतर्गत नवीन शौचालयांचे बांधकाम हा आहे.",
-                "te": "గ్రామస్తులందరికీ నమస్కారం. ఈరోజు గ్రామా సభ సమావేశానికి స్వాగతం. ఈరోజు ప్రధాన ఎజెండా గ్రామ రోడ్ల మరమ్మతులు మరియు స్వచ్ఛ భారత్ అభియాన్ కింద కొత్త టాయిలెట్ల నిర్మాణం.",
-                "hi": "नमस्कार सभी ग्राम वासियों को। आज की ग्राम सभा बैठक में आप सभी का स्वागत है। आज का मुख्य एजेंडा गांव की सड़कों की मरम्मत और स्वच्छ भारत अभियान के तहत नए शौचालयों का निर्माण है।"
+                "en": "Hello everyone. Welcome to today's corporate strategy meeting. Today's main agenda is system performance optimization and strategic product release.",
+                "mr": "सर्व सदस्यांना नमस्कार. आजच्या कॉर्पोरेट बैठकीत तुम्हा सर्वांचे स्वागत आहे.",
+                "te": "అందరికీ నమస్కారం. నేటి కార్పొరేట్ సమావేశానికి స్వాగతం.",
+                "hi": "नमस्कार आप सभी का। आज की कॉर्पोरेट रणनीति बैठक में आपका स्वागत है।"
             },
             "सचिव जी, हमारे वार्ड नंबर ३ की सड़क बहुत खराब है। बरसात में वहां पानी भर जाता है। हमें जल्द से जल्द सड़क निर्माण की आवश्यकता है। और पानी की निकासी के लिए नाली भी बननी चाहिए।": {
                 "en": "Secretary ji, the road in our ward number 3 is very bad. Water accumulates there during the rainy season. We need road construction as soon as possible. And a drain should also be built for water drainage.",

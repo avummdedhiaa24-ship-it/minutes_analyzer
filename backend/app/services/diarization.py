@@ -33,6 +33,8 @@ class SpeakerSegment:
             "overlapping": self.overlapping
         }
 
+from app.services.diarization_engine import multi_signal_diarization_engine, SpeakerSegmentDetail
+
 class DiarizationBackend(ABC):
     """Abstract interface for speaker diarization backends."""
     @abstractmethod
@@ -40,62 +42,24 @@ class DiarizationBackend(ABC):
         pass
 
 class PyAnnoteDiarizationBackend(DiarizationBackend):
-    """Primary Diarization Backend using PyAnnote.audio speaker-diarization-3.1 pipeline."""
+    """Primary Diarization Backend using PyAnnote / Multi-Signal Diarization Engine."""
     
-    def __init__(self):
-        self.pipeline = None
-        self._load_pipeline()
-
-    def _load_pipeline(self):
-        try:
-            from pyannote.audio import Pipeline
-            hf_token = os.getenv("HUGGINGFACE_TOKEN", None)
-            logger.info("Initializing PyAnnote speaker diarization 3.1 pipeline...")
-            self.pipeline = Pipeline.from_pretrained(
-                "pyannote/speaker-diarization-3.1",
-                use_auth_token=hf_token
-            )
-            logger.info("PyAnnote speaker diarization pipeline loaded successfully.")
-        except Exception as e:
-            logger.warning(f"PyAnnote pipeline unavailable ({e}). Fallback to Legacy MFCC Diarization.")
-            self.pipeline = None
-
     def diarize(self, audio_path: str, chunks: List[Dict[str, Any]]) -> List[SpeakerSegment]:
-        if not self.pipeline:
-            # Fallback if PyAnnote pipeline failed to initialize
-            return LegacyMFCCDiarizationBackend().diarize(audio_path, chunks)
-
         try:
-            diarization_res = self.pipeline(audio_path)
-            segments: List[SpeakerSegment] = []
-
-            # Map pyannote diarization timeline to transcript chunks
-            for turn, _, speaker in diarization_res.itertracks(yield_label=True):
-                spk_idx = hash(speaker) % len(SPEAKER_ROLE_LABELS)
-                role = SPEAKER_ROLE_LABELS[spk_idx]
-                label = f"Speaker {speaker} ({role})"
-                
-                # Check for overlap with existing segments
-                is_overlap = False
-                for seg in segments:
-                    if max(seg.start, turn.start) < min(seg.end, turn.end):
-                        is_overlap = True
-                        seg.overlapping = True
-                        break
-
-                segments.append(SpeakerSegment(
-                    speaker=label,
-                    start=round(turn.start, 1),
-                    end=round(turn.end, 1),
-                    text="",
-                    overlapping=is_overlap
-                ))
-            return segments
-
+            segments_detail, _ = multi_signal_diarization_engine.process(audio_path, chunks)
+            return [
+                SpeakerSegment(
+                    speaker=s.speaker,
+                    start=s.start,
+                    end=s.end,
+                    text=s.text,
+                    overlapping=s.overlapping
+                )
+                for s in segments_detail
+            ]
         except Exception as e:
-            logger.error(f"PyAnnote diarization error ({e}), falling back to Legacy MFCC.")
+            logger.error(f"Multi-Signal Diarization error ({e}); using Legacy MFCC.")
             return LegacyMFCCDiarizationBackend().diarize(audio_path, chunks)
-
 
 class LegacyMFCCDiarizationBackend(DiarizationBackend):
     """Legacy Diarization Backend using librosa MFCCs & scikit-learn Agglomerative Clustering."""

@@ -1,0 +1,39 @@
+{
+  "scenario_id": "case_09_long_gap_reentry",
+  "description": "Speaker A -> Speaker B -> Speaker C -> Speaker A returns after 60s gap. Expected: RE-REUSE Speaker 1 ID.",
+  "audio_duration_seconds": 90.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 10.0,
+        "text": "Opening the executive committee meeting."
+      },
+      {
+        "speaker": "Speaker 2 (VP)",
+        "start": 10.0,
+        "end": 35.0,
+        "text": "Reviewing financial forecasts and revenue models."
+      },
+      {
+        "speaker": "Speaker 3 (Legal)",
+        "start": 35.0,
+        "end": 70.0,
+        "text": "Addressing regulatory risk compliance in region 2."
+      },
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 70.0,
+        "end": 90.0,
+        "text": "Thank you all, let us adjourn the session."
+      }
+    ],
+    "speaker_changes": [
+      { "timestamp": 10.0, "from_speaker": "Speaker 1 (Manager)", "to_speaker": "Speaker 2 (VP)", "confidence": 0.95 },
+      { "timestamp": 35.0, "from_speaker": "Speaker 2 (VP)", "to_speaker": "Speaker 3 (Legal)", "confidence": 0.95 },
+      { "timestamp": 70.0, "from_speaker": "Speaker 3 (Legal)", "to_speaker": "Speaker 1 (Manager)", "confidence": 0.95 }
+    ],
+    "overlaps": []
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "scenario_id": "case_04_long_pause_same_speaker",
+  "description": "Speaker A speaks -> 4 second silence -> Speaker A continues. Expected: NO SPEAKER CHANGE.",
+  "audio_duration_seconds": 15.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 5.0,
+        "text": "Let me review the document for a moment."
+      },
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 9.0,
+        "end": 15.0,
+        "text": "Okay, the compliance clause looks good to proceed."
+      }
+    ],
+    "speaker_changes": [],
+    "overlaps": []
+  }
+}

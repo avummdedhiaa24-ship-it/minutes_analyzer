@@ -1,0 +1,34 @@
+{
+  "scenario_id": "case_11_overlapping_speech",
+  "description": "Simultaneous speech from Speaker A and Speaker B. Expected: OVERLAP PREDICTED = TRUE.",
+  "audio_duration_seconds": 10.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 6.0,
+        "text": "We need to finalize the deployment strategy today."
+      },
+      {
+        "speaker": "Speaker 2 (Engineer)",
+        "start": 3.0,
+        "end": 8.0,
+        "text": "Wait, let me double check the cluster capacity.",
+        "overlapping": true,
+        "primary_speaker": "Speaker 1 (Manager)",
+        "secondary_speaker": "Speaker 2 (Engineer)"
+      }
+    ],
+    "speaker_changes": [],
+    "overlaps": [
+      {
+        "start": 3.0,
+        "end": 6.0,
+        "primary_speaker": "Speaker 1 (Manager)",
+        "secondary_speaker": "Speaker 2 (Engineer)",
+        "confidence": 0.90
+      }
+    ]
+  }
+}

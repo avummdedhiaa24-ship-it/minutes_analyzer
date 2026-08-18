@@ -1,0 +1,31 @@
+{
+  "scenario_id": "case_01_simple_transition",
+  "description": "Speaker A -> Speaker B simple transition with clear acoustic boundary",
+  "audio_duration_seconds": 12.0,
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Speaker 1 (Manager)",
+        "start": 0.0,
+        "end": 6.0,
+        "text": "We are initiating the infrastructure migration plan today."
+      },
+      {
+        "speaker": "Speaker 2 (Architect)",
+        "start": 6.0,
+        "end": 12.0,
+        "text": "The container cluster setup is ready for deployment."
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 6.0,
+        "from_speaker": "Speaker 1 (Manager)",
+        "to_speaker": "Speaker 2 (Architect)",
+        "confidence": 1.0,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

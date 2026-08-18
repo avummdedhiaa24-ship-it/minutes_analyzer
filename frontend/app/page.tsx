@@ -53,8 +53,10 @@ import {
   MapPin,
   Smartphone,
   DollarSign,
-  Cpu
+  Cpu,
+  Radio
 } from "lucide-react";
+import SpeakerTimelineView from "./components/meeting/SpeakerTimelineView";
 import { 
   analyticsApi, 
   meetingsApi, 
@@ -313,6 +315,19 @@ function DashboardView() {
               </button>
             ) : null}
 
+            {userRole === "Manager" || userRole === "System Admin" || userRole === "CEO" ? (
+              <button 
+                onClick={() => {
+                  window.history.pushState({}, "", "/meetings");
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl flex items-center shadow-lg transition-all"
+              >
+                <Radio className="h-4 w-4 mr-2 animate-pulse" />
+                🔴 Start Live Meeting Capture
+              </button>
+            ) : null}
+
             {userRole === "CEO" || userRole === "Manager" || userRole === "System Admin" ? (
               <button 
                 onClick={() => {
@@ -396,6 +411,39 @@ function DashboardView() {
           );
         })}
       </div>
+
+      {/* Active Live Recording Banner */}
+      {recentMeetings.some((m: any) => m.recording_status === "recording" || m.status === "in_progress") && (
+        <div className="bg-gradient-to-r from-slate-900 via-rose-950/60 to-slate-900 border border-rose-500/30 rounded-2xl p-5 shadow-lg text-white flex flex-wrap items-center justify-between gap-4 animate-pulse">
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+            </span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-rose-400">● Live Active Recording</span>
+                <span className="text-xs text-slate-400">•</span>
+                <span className="text-xs font-semibold text-slate-200">
+                  {recentMeetings.find((m: any) => m.recording_status === "recording" || m.status === "in_progress")?.title}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Microphone stream is actively capturing meeting audio and generating real-time sequence ACKs.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              const activeM = recentMeetings.find((m: any) => m.recording_status === "recording" || m.status === "in_progress");
+              if (activeM) window.location.href = `/meetings/${activeM.id}/live`;
+            }}
+            className="px-5 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 rounded-xl shadow-md transition"
+          >
+            Open Live Workspace & Controls
+          </button>
+        </div>
+      )}
 
       {/* Needs Your Attention Priority Queue */}
       <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-5 shadow-sm">
@@ -1155,6 +1203,8 @@ function MeetingsPage() {
   const [date, setDate] = useState("");
   const [location, setLocation] = useState("");
   const [agenda, setAgenda] = useState("");
+  const [enableRecording, setEnableRecording] = useState(false);
+  const [authorizationConfirmed, setAuthorizationConfirmed] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [createdMeeting, setCreatedMeeting] = useState<any | null>(null);
   const [meetings, setMeetings] = useState<any[]>([]);
@@ -1196,7 +1246,9 @@ function MeetingsPage() {
         location,
         agenda,
         scheduled_start: new Date(date).toISOString(),
-        agenda_pdf_url: ""
+        agenda_pdf_url: "",
+        enable_recording: enableRecording,
+        authorization_confirmed: authorizationConfirmed
       }, token);
 
       setCreatedMeeting(data);
@@ -1205,6 +1257,8 @@ function MeetingsPage() {
       setDate("");
       setLocation("");
       setAgenda("");
+      setEnableRecording(false);
+      setAuthorizationConfirmed(false);
       // Reload meetings list
       await loadMeetings();
     } catch (err: any) {
@@ -1291,6 +1345,34 @@ function MeetingsPage() {
                 />
               </div>
 
+              <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={enableRecording}
+                    onChange={(e) => setEnableRecording(e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                  />
+                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    Enable Automatic Meeting Recording Mode
+                  </span>
+                </label>
+
+                {enableRecording && (
+                  <label className="flex items-start gap-2.5 pl-6 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={authorizationConfirmed}
+                      onChange={(e) => setAuthorizationConfirmed(e.target.checked)}
+                      className="w-3.5 h-3.5 mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                    />
+                    <span className="text-[11px] text-slate-600 dark:text-slate-400">
+                      I confirm that I am authorized to initiate recording for this meeting and that participants will be informed according to organizational policy.
+                    </span>
+                  </label>
+                )}
+              </div>
+
               <button 
                 type="submit" 
                 disabled={submitLoading}
@@ -1329,12 +1411,23 @@ function MeetingsPage() {
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">Digital Check-in Pass Ready</h4>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto mt-1">Participants scan this code via mobile app to register check-in logs immediately.</p>
               </div>
-              <button 
-                onClick={() => setShowQR(false)}
-                className="px-4 py-2 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg hover:bg-slate-50"
-              >
-                Close Ticket
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+                <button 
+                  onClick={() => {
+                    window.location.href = `/meetings/${createdMeeting.id}/live`;
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                >
+                  <Radio className="w-3.5 h-3.5 animate-pulse" />
+                  Start Recording Now
+                </button>
+                <button 
+                  onClick={() => setShowQR(false)}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  Close Ticket
+                </button>
+              </div>
             </div>
           ) : (
             <div className="text-slate-400 space-y-2">
@@ -1348,7 +1441,12 @@ function MeetingsPage() {
 
       {/* Scheduled meetings listing */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
-        <h3 className="text-base font-bold mb-4">Official Meeting Schedules & Agenda Registry</h3>
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Official Meeting Schedules & Agenda Registry</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select any meeting below to launch its live recording workspace or view meeting studio.</p>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -1381,15 +1479,31 @@ function MeetingsPage() {
                       {meet.status}
                     </span>
                   </td>
-                  <td className="py-4 text-right space-x-2">
+                  <td className="py-4 text-right whitespace-nowrap space-x-2">
+                    <button 
+                      onClick={() => {
+                        window.location.href = `/meetings/${meet.id}/live`;
+                      }}
+                      className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold rounded-xl shadow-sm inline-flex items-center gap-1 transition"
+                    >
+                      <Radio className="w-3.5 h-3.5 animate-pulse" /> Live Capture
+                    </button>
+                    <button 
+                      onClick={() => {
+                        window.location.href = `/verify?meeting_id=${meet.id}`;
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm inline-flex items-center gap-1 transition"
+                    >
+                      <FileCheck className="w-3.5 h-3.5" /> Studio
+                    </button>
                     <button 
                       onClick={() => {
                         setCreatedMeeting(meet);
                         setShowQR(true);
                       }}
-                      className="text-xs text-indigo-600 font-bold hover:underline"
+                      className="px-2.5 py-1.5 text-xs text-slate-500 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700 rounded-xl inline-flex items-center gap-1 transition hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
-                      Show QR
+                      <QrCode className="w-3.5 h-3.5" /> QR Pass
                     </button>
                   </td>
                 </tr>
@@ -1811,7 +1925,7 @@ function VerifyPage() {
   const [translationLanguage, setTranslationLanguage] = useState("original");
   const [translationData, setTranslationData] = useState<any>(null);
   const [translationLoading, setTranslationLoading] = useState(false);
-  const [leftTab, setLeftTab] = useState<"transcript" | "attendance">("transcript");
+  const [leftTab, setLeftTab] = useState<"transcript" | "timeline" | "attendance">("transcript");
 
   // Attendance manual add
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -1856,21 +1970,24 @@ function VerifyPage() {
   };
 
   useEffect(() => {
-    loadDrafts();
+    const urlParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const targetId = urlParams?.get("meeting_id");
+    loadDrafts(targetId);
   }, []);
 
-  const loadDrafts = async () => {
+  const loadDrafts = async (targetMeetingId?: string | null) => {
     const token = getAuthToken();
     try {
       const all = await meetingsApi.list(token);
-      const drafts = all.filter((m: any) => m.status === "draft" || m.status === "approved" || m.status === "processing" || m.status === "scheduled");
-      setDraftMeetings(drafts);
-      if (drafts.length > 0) {
-        setSelectedMeetingId(String(drafts[0].id));
-        loadMeetingMinutes(drafts[0].id);
+      setDraftMeetings(all);
+      if (all.length > 0) {
+        const found = targetMeetingId ? all.find((m: any) => String(m.id) === String(targetMeetingId)) : null;
+        const initialMeeting = found || all[0];
+        setSelectedMeetingId(String(initialMeeting.id));
+        loadMeetingMinutes(initialMeeting.id);
       }
     } catch (err: any) {
-      setError("Failed to fetch draft meetings list.");
+      setError("Failed to fetch meetings list.");
     }
   };
 
@@ -1896,14 +2013,22 @@ function VerifyPage() {
         setDiarizedSegments([]);
       }
 
-      const minutes = await minutesApi.get(meetingId, token);
-      setMinutesData(minutes);
+      try {
+        const minutes = await minutesApi.get(meetingId, token);
+        setMinutesData(minutes);
 
-      // Populate edit fields
-      setSummary(minutes.summary || "");
-      setTopicsStr(JSON.stringify(minutes.topics || [], null, 2));
-      setSchemesStr(JSON.stringify(minutes.schemes || [], null, 2));
-      setBudgetStr(JSON.stringify(minutes.budget_summary || {}, null, 2));
+        // Populate edit fields
+        setSummary(minutes.summary || "");
+        setTopicsStr(JSON.stringify(minutes.topics || [], null, 2));
+        setSchemesStr(JSON.stringify(minutes.schemes || [], null, 2));
+        setBudgetStr(JSON.stringify(minutes.budget_summary || {}, null, 2));
+      } catch (minErr: any) {
+        setMinutesData(null);
+        setSummary("");
+        setTopicsStr("[]");
+        setSchemesStr("[]");
+        setBudgetStr("{}");
+      }
 
       // Load all users for attendance dropdown
       try {
@@ -1912,8 +2037,7 @@ function VerifyPage() {
         if (users.length > 0) setAddAttendeeId(String(users[0].id));
       } catch (_) {}
     } catch (err: any) {
-      setError(err.message || "Failed to load minutes details.");
-      setMinutesData(null);
+      setError(err.message || "Failed to load meeting details.");
     } finally {
       setLoading(false);
     }
@@ -2148,8 +2272,8 @@ function VerifyPage() {
           {/* ==================== LEFT PANEL: TRANSCRIPT EDITOR & ATTENDANCE ==================== */}
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4 flex flex-col h-[700px]">
             {/* Panel Tabs */}
-            <div className="flex border-b border-slate-200 dark:border-slate-800 pb-2 justify-between items-center">
-              <div className="flex space-x-4">
+            <div className="flex flex-wrap border-b border-slate-200 dark:border-slate-800 pb-3 justify-between items-center gap-3">
+              <div className="flex flex-wrap space-x-2 sm:space-x-4">
                 <button
                   onClick={() => setLeftTab("transcript")}
                   className={`text-xs font-bold pb-2 transition-all border-b-2 flex items-center gap-1.5 ${
@@ -2159,7 +2283,18 @@ function VerifyPage() {
                   }`}
                 >
                   <FileText className="h-4 w-4" />
-                  {t("Meeting Transcript")} ({diarizedSegments.length} Segments)
+                  {t("Meeting Transcript")} ({diarizedSegments.length})
+                </button>
+                <button
+                  onClick={() => setLeftTab("timeline")}
+                  className={`text-xs font-bold pb-2 transition-all border-b-2 flex items-center gap-1.5 ${
+                    leftTab === "timeline"
+                      ? "border-indigo-600 text-indigo-600 dark:text-indigo-400"
+                      : "border-transparent text-slate-400 hover:text-slate-600"
+                  }`}
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  Speaker Timeline
                 </button>
                 <button
                   onClick={() => setLeftTab("attendance")}
@@ -2170,15 +2305,15 @@ function VerifyPage() {
                   }`}
                 >
                   <Users className="h-4 w-4" />
-                  {t("Participants / Attendance")} ({meetingDetail?.attendance?.length ?? 0})
+                  {t("Attendance")} ({meetingDetail?.attendance?.length ?? 0})
                 </button>
               </div>
 
               {leftTab === "transcript" && (
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 shrink-0">
                   <button
                     onClick={() => setIsEditingTranscript(!isEditingTranscript)}
-                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 flex items-center gap-1"
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 flex items-center gap-1 transition-all shadow-sm"
                   >
                     <Edit3 className="h-3 w-3" />
                     {isEditingTranscript ? "View Mode" : "Edit Transcript"}
@@ -2186,7 +2321,7 @@ function VerifyPage() {
                   <button
                     onClick={handleRegenerateMinutes}
                     disabled={regeneratingMinutes}
-                    className="px-3 py-1 text-[11px] font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                    className="px-3 py-1 text-[11px] font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition-all"
                   >
                     {regeneratingMinutes ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
                     {t("Re-generate Minutes")}
@@ -2331,6 +2466,17 @@ function VerifyPage() {
                     </button>
                   )}
                 </div>
+              </div>
+            ) : leftTab === "timeline" ? (
+              /* Speaker Timeline Tab */
+              <div className="flex-1 overflow-y-auto pr-1">
+                <SpeakerTimelineView
+                  segments={diarizedSegments}
+                  onRenameSpeaker={(oldName, newName) => {
+                    const updated = diarizedSegments.map((s) => (s.speaker === oldName ? { ...s, speaker: newName } : s));
+                    setDiarizedSegments(updated);
+                  }}
+                />
               </div>
             ) : (
               /* Attendance / Participants Tab */

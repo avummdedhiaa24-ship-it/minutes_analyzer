@@ -1,9 +1,15 @@
 const BASE_URL = "http://localhost:8000/api/v1";
 
+export function getAuthToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("auth_token") || localStorage.getItem("token");
+}
+
 function getHeaders(token?: string | null): HeadersInit {
   const headers: HeadersInit = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+  const activeToken = token || getAuthToken();
+  if (activeToken) {
+    headers["Authorization"] = `Bearer ${activeToken}`;
   }
   return headers;
 }
@@ -94,6 +100,10 @@ export const meetingsApi = {
   },
 
   get: (id: number, token?: string | null) => {
+    return apiRequest(`/meetings/${id}`, "GET", null, token);
+  },
+
+  getById: (id: number, token?: string | null) => {
     return apiRequest(`/meetings/${id}`, "GET", null, token);
   },
 
@@ -204,4 +214,43 @@ export const attendanceApi = {
     return apiRequest(`/auth/users`, "GET", null, token);
   },
 };
+
+// Live Meeting Recording & Transport API
+export const recordingApi = {
+  start: (meetingId: number, authorizationConfirmed: boolean = true, token?: string | null) => {
+    return apiRequest(`/audio/recording/${meetingId}/start`, "POST", { authorization_confirmed: authorizationConfirmed }, token);
+  },
+  pause: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/recording/${meetingId}/pause`, "POST", null, token);
+  },
+  resume: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/recording/${meetingId}/resume`, "POST", null, token);
+  },
+  uploadChunk: (meetingId: number, sequenceNumber: number, chunkBlob: Blob, checksum?: string, token?: string | null) => {
+    const formData = new FormData();
+    formData.append("sequence_number", sequenceNumber.toString());
+    if (checksum) formData.append("checksum", checksum);
+    formData.append("chunk_file", chunkBlob, `chunk_${sequenceNumber}.webm`);
+    return apiRequest(`/audio/recording/${meetingId}/stream`, "POST", formData, token, true);
+  },
+  stop: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/recording/${meetingId}/stop`, "POST", null, token);
+  },
+  getStatus: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/recording/${meetingId}/status`, "GET", null, token);
+  },
+  getProcessingStatus: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/processing/${meetingId}/status`, "GET", null, token);
+  },
+  retryProcessing: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/processing/${meetingId}/retry`, "POST", null, token);
+  },
+  createMarker: (meetingId: number, label: string, timestampSeconds: number, note?: string, token?: string | null) => {
+    return apiRequest(`/audio/markers/${meetingId}`, "POST", { label, timestamp_seconds: timestampSeconds, note }, token);
+  },
+  getMarkers: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/markers/${meetingId}`, "GET", null, token);
+  },
+};
+
 

@@ -63,9 +63,9 @@ def get_dashboard_metrics(
 
     # Speaking time distributions (mock statistics)
     speaking_times = [
-        {"name": "Secretary", "value": 30},
-        {"name": "Sarpanch (Moderator)", "value": 45},
-        {"name": "Citizens", "value": 25}
+        {"name": "Meeting Host", "value": 30},
+        {"name": "Chairperson (Moderator)", "value": 45},
+        {"name": "Participants", "value": 25}
     ]
 
     return {

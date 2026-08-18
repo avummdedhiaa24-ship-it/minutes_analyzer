@@ -175,10 +175,14 @@ class MeetingBase(BaseModel):
 
 class MeetingCreate(MeetingBase):
     agenda_pdf_url: Optional[str] = None
+    enable_recording: Optional[bool] = False
+    authorization_confirmed: Optional[bool] = False
 
 class MeetingResponse(MeetingBase):
     id: int
     status: str
+    recording_status: Optional[str] = "not_started"
+    processing_status: Optional[str] = "idle"
     qr_code_data: Optional[str] = None
     agenda_pdf_url: Optional[str] = None
     audio_url: Optional[str] = None
@@ -238,3 +242,128 @@ class ChatCitation(BaseModel):
 class ChatResponse(BaseModel):
     content: str
     citations: List[ChatCitation]
+
+# Recording & Processing Schemas
+class RecordingConsentRequest(BaseModel):
+    authorization_confirmed: bool = True
+
+class RecordingStartRequest(BaseModel):
+    authorization_confirmed: bool = True
+
+class RecordingStatusResponse(BaseModel):
+    meeting_id: int
+    meeting_status: str
+    recording_status: str
+    duration: float = 0.0
+    file_size: int = 0
+    mime_type: str = "audio/webm"
+    authorization_confirmed: bool = False
+    authorization_timestamp: Optional[datetime] = None
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    received_chunks_count: int = 0
+
+class RecordingChunkUploadResponse(BaseModel):
+    recording_id: int
+    sequence_number: int
+    status: str = "acknowledged"
+    received_total_chunks: int
+    total_bytes: int
+
+class ProcessingStatusResponse(BaseModel):
+    meeting_id: int
+    meeting_status: str
+    processing_status: str
+    current_stage: str
+    progress_percent: int
+    message: str
+    error_details: Optional[str] = None
+    can_retry: bool = False
+
+class MeetingMarkerCreateRequest(BaseModel):
+    timestamp_seconds: float
+    label: str  # Decision, Action Item, Important Discussion, Question, Follow-Up
+    note: Optional[str] = None
+
+class MeetingMarkerResponse(BaseModel):
+    id: int
+    meeting_id: int
+    recording_id: Optional[int] = None
+    created_by_id: int
+    timestamp_seconds: float
+    label: str
+    note: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Diarization Schemas
+class SpeakerProfileResponse(BaseModel):
+    id: int
+    meeting_id: int
+    cluster_id: str
+    display_name: str
+    confidence: float
+    total_duration: float
+
+    class Config:
+        from_attributes = True
+
+class SpeakerSegmentResponse(BaseModel):
+    id: Optional[int] = None
+    meeting_id: int
+    speaker_id: str
+    start_time: float
+    end_time: float
+    duration: float
+    transcript_text: str
+    confidence: float
+    overlapping: bool = False
+    primary_speaker: Optional[str] = None
+    secondary_speaker: Optional[str] = None
+    audio_quality: float = 1.0
+
+    class Config:
+        from_attributes = True
+
+class SpeakerChangeEventResponse(BaseModel):
+    id: Optional[int] = None
+    meeting_id: int
+    timestamp: float
+    from_speaker: str
+    to_speaker: str
+    confidence: float
+    change_score: float
+    embedding_score: float
+    acoustic_score: float
+    vad_score: float
+    energy_score: float
+    cluster_score: float
+    confirmation_status: str
+
+    class Config:
+        from_attributes = True
+
+class DiarizationQualityResponse(BaseModel):
+    meeting_id: int
+    der: Optional[float] = None
+    jer: Optional[float] = None
+    speaker_change_precision: Optional[float] = None
+    speaker_change_recall: Optional[float] = None
+    speaker_change_f1: Optional[float] = None
+    false_change_rate: Optional[float] = None
+    missed_change_rate: Optional[float] = None
+    overlap_detection_rate: Optional[float] = None
+    average_confidence: float = 0.92
+    speaker_count: int = 0
+    segment_count: int = 0
+
+class SpeakerCorrectionRequest(BaseModel):
+    segment_id: Optional[int] = None
+    original_speaker: str
+    corrected_speaker: str
+    action_type: str = "rename"  # rename, merge, split, change_assignment, mark_overlap
+    reason: Optional[str] = "human_correction"
+
+

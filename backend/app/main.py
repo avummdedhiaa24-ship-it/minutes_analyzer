@@ -5,7 +5,7 @@ import os
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.seed_data import seed_db
-from app.routers import auth, meetings, attendance, audio, minutes, translation, chat, search, analytics, audit
+from app.routers import auth, meetings, attendance, audio, minutes, translation, chat, search, analytics, audit, action_items, decisions
 
 # Initialize database schemas & seed initial corporate accounts
 Base.metadata.create_all(bind=engine)
@@ -40,6 +40,8 @@ app.include_router(chat.router, prefix=settings.API_V1_STR)
 app.include_router(search.router, prefix=settings.API_V1_STR)
 app.include_router(analytics.router, prefix=settings.API_V1_STR)
 app.include_router(audit.router, prefix=settings.API_V1_STR)
+app.include_router(action_items.router, prefix=settings.API_V1_STR)
+app.include_router(decisions.router, prefix=settings.API_V1_STR)
 
 @app.get("/health", tags=["System Health"])
 def health_check():

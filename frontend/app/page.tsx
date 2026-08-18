@@ -68,7 +68,9 @@ import {
   translationApi,
   attendanceApi
 } from "./lib/api";
-import { useTranslation } from "./lib/translations";
+import ActionItemsDashboard from "./action-items/page";
+import DecisionsRegister from "./decisions/page";
+import { useTranslation, LanguageCode } from "./lib/translations";
 
 // Helper to access token and user locally
 const getAuthToken = () => typeof window !== "undefined" ? localStorage.getItem("auth_token") : null;
@@ -116,6 +118,8 @@ export default function Dashboard() {
 
   // Render subpage content based on route with RBAC guard
   if (activeTab === "meetings" && allowedTabs.includes("meetings")) return <MeetingsPage />;
+  if (activeTab === "action-items") return <ActionItemsDashboard />;
+  if (activeTab === "decisions") return <DecisionsRegister />;
   if (activeTab === "attendance" && allowedTabs.includes("attendance")) return <AttendancePortalPage />;
   if (activeTab === "record" && allowedTabs.includes("record")) return <RecordPage />;
   if (activeTab === "verify" && allowedTabs.includes("verify")) return <VerifyPage />;

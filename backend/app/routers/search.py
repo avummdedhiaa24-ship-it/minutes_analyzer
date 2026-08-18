@@ -8,28 +8,86 @@ from app.services.rag import rag_service
 
 router = APIRouter(prefix="/search", tags=["Global Search"])
 
-@router.get("", response_model=List[Dict[str, Any]])
-def search_meetings(
+@router.get("", response_model=Dict[str, Any])
+def global_enterprise_search(
     query: str,
     db: Session = Depends(get_db)
 ):
-    if not query:
+    if not query or len(query.strip()) == 0:
         raise HTTPException(status_code=400, detail="Search query must not be empty.")
-    
-    # Run vector semantic search
+
+    q = f"%{query.strip()}%"
+
+    # 1. Search Decisions
+    decisions = db.query(models.Decision).filter(
+        (models.Decision.decision_text.ilike(q)) | 
+        (models.Decision.rationale.ilike(q)) |
+        (models.Decision.category.ilike(q))
+    ).all()
+
+    dec_results = [
+        {
+            "id": d.id,
+            "meeting_id": d.meeting_id,
+            "type": "decision",
+            "title": d.decision_text,
+            "subtitle": f"Rationale: {d.rationale or 'N/A'}",
+            "category": d.category,
+            "impact": d.impact_level,
+            "timestamp": d.source_timestamp,
+            "speaker": d.source_speaker or "Speaker",
+            "url": f"/decisions"
+        } for d in decisions
+    ]
+
+    # 2. Search Action Items
+    actions = db.query(models.ActionItem).filter(
+        (models.ActionItem.title.ilike(q)) |
+        (models.ActionItem.description.ilike(q)) |
+        (models.ActionItem.responsible_person.ilike(q))
+    ).all()
+
+    act_results = [
+        {
+            "id": a.id,
+            "meeting_id": a.meeting_id,
+            "type": "action_item",
+            "title": a.title,
+            "subtitle": f"Owner: {a.responsible_person or 'Unassigned'} • Status: {a.status}",
+            "priority": a.priority,
+            "status": a.status,
+            "timestamp": a.source_timestamp,
+            "speaker": a.source_speaker or "Speaker",
+            "url": f"/action-items"
+        } for a in actions
+    ]
+
+    # 3. Search Meetings
+    meetings = db.query(models.Meeting).filter(
+        (models.Meeting.title.ilike(q)) |
+        (models.Meeting.agenda.ilike(q)) |
+        (models.Meeting.department.ilike(q))
+    ).all()
+
+    meet_results = [
+        {
+            "id": m.id,
+            "type": "meeting",
+            "title": m.title,
+            "subtitle": f"Department: {m.department} • Date: {m.date.strftime('%Y-%m-%d')}",
+            "status": m.status,
+            "url": f"/verify?meeting_id={m.id}"
+        } for m in meetings
+    ]
+
+    # 4. RAG Vector Semantic Matches
     semantic_matches = rag_service.search(query, limit=5)
-    
-    # We will attach metadata, like the meeting date and current approval status
-    results = []
-    for match in semantic_matches:
-        meeting = db.query(models.Meeting).filter(models.Meeting.id == match["meeting_id"]).first()
-        status_val = meeting.status if meeting else "unknown"
-        date_val = meeting.date.strftime("%Y-%m-%d") if meeting else ""
-        
-        results.append({
-            **match,
-            "status": status_val,
-            "date": date_val
-        })
-        
-    return results
+
+    return {
+        "query": query,
+        "total_results": len(dec_results) + len(act_results) + len(meet_results) + len(semantic_matches),
+        "decisions": dec_results,
+        "action_items": act_results,
+        "meetings": meet_results,
+        "semantic_matches": semantic_matches
+    }

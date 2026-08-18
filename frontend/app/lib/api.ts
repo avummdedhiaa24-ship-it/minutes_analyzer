@@ -253,4 +253,46 @@ export const recordingApi = {
   },
 };
 
+// Action Items Execution Dashboard API
+export const actionItemsApi = {
+  list: (status?: string, priority?: string, meetingId?: number, token?: string | null) => {
+    let query = [];
+    if (status) query.push(`status=${encodeURIComponent(status)}`);
+    if (priority) query.push(`priority=${encodeURIComponent(priority)}`);
+    if (meetingId) query.push(`meeting_id=${meetingId}`);
+    const qStr = query.length > 0 ? `?${query.join("&")}` : "";
+    return apiRequest(`/action-items${qStr}`, "GET", null, token);
+  },
+  create: (data: any, token?: string | null) => {
+    return apiRequest(`/action-items`, "POST", data, token);
+  },
+  update: (id: number, data: any, token?: string | null) => {
+    return apiRequest(`/action-items/${id}`, "PUT", data, token);
+  },
+  delete: (id: number, token?: string | null) => {
+    return apiRequest(`/action-items/${id}`, "DELETE", null, token);
+  },
+};
+
+// Decision Register API
+export const decisionsApi = {
+  list: (category?: string, impactLevel?: string, meetingId?: number, token?: string | null) => {
+    let query = [];
+    if (category) query.push(`category=${encodeURIComponent(category)}`);
+    if (impactLevel) query.push(`impact_level=${encodeURIComponent(impactLevel)}`);
+    if (meetingId) query.push(`meeting_id=${meetingId}`);
+    const qStr = query.length > 0 ? `?${query.join("&")}` : "";
+    return apiRequest(`/decisions${qStr}`, "GET", null, token);
+  },
+  create: (data: any, token?: string | null) => {
+    return apiRequest(`/decisions`, "POST", data, token);
+  },
+  update: (id: number, data: any, token?: string | null) => {
+    return apiRequest(`/decisions/${id}`, "PUT", data, token);
+  },
+  delete: (id: number, token?: string | null) => {
+    return apiRequest(`/decisions/${id}`, "DELETE", null, token);
+  },
+};
+
 

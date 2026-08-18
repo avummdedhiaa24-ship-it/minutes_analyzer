@@ -1,122 +1,126 @@
-# Corporate AI Meeting Minutes & Transcripts Platform
+# Enterprise AI Meeting Operating System & Governance Platform
 
-Corporate AI Meeting Minutes & Transcripts Platform is an enterprise-ready, AI-powered corporate governance and meeting intelligence platform. The application converts multilingual meeting audio into structured, searchable, translated, and legally auditable corporate meeting minutes, featuring a human-in-the-loop review dashboard, executive demographic & department analytics, acoustic speaker diarization, cryptographic audit trail, and a RAG-based AI retrieval chatbot.
+**Enterprise AI Meeting Operating System** is a multi-tenant, AI-powered corporate meeting intelligence, execution tracking, and cryptographic governance platform. The system captures live dual-source audio (microphones & browser tab audio) or audio uploads, applies **multi-signal speaker diarization** and Whisper ASR transcription, generates **grounded AI meeting minutes**, tracks **action items & corporate decisions**, enforces **multi-version document approvals**, and seals records with **cryptographic SHA-256 audit hash chains**.
 
 ---
 
-## Technical Architecture
-
-The platform is split into a modular FastAPI backend and Next.js client codebase:
+## 🏛️ System Architecture
 
 ```mermaid
 graph TD
-    A[Multilingual Meeting Audio Upload / Live Mic] --> B[ffmpeg WebM-to-WAV Conversion]
-    B --> C[Acoustic MFCC Voice Diarization]
-    C --> D[ASR Engine: Whisper / Bhashini / MMS]
-    D --> E[Post-ASR Transcript Normalization & Polishing]
-    E --> F[Indic NMT Translation - Hindi / Marathi / Telugu / English]
-    F --> G[NLP Minutes Extraction: Topics, Decisions, Risks, Follow-ups]
-    G --> H[Human-in-the-Loop Review & Sign-off Editor]
-    H --> I[Approved & SHA256 Digitally Signed]
-    I --> J[PostgreSQL / SQLite Corporate Data Store]
-    I --> K[RAG FAISS / SentenceTransformer Search Index]
+    A[Live Dual-Source Capture / Audio Upload] --> B[16kHz Mono Preprocessing & VAD Filtering]
+    B --> C[Whisper ASR Speech-to-Text]
+    C --> D[Multi-Signal Diarization Engine]
+    D --> E[Word-Level ASR Alignment]
+    E --> F[Grounded AI Minutes Extraction]
+    F --> G[Action Items Dashboard & Decision Register]
+    G --> H[Human-in-the-Loop Review & Versioning]
+    H --> I[SHA-256 Cryptographic Audit Hash Chain]
+    I --> J[Global Enterprise Search & RAG Vector Index]
 ```
 
-### Folder Structure
+### 📁 Project Folder Structure
 
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── core/           # Configs, DB sessions, Pydantic settings
-│   │   ├── services/       # AI pipeline, Acoustic Diarization, Bhashini, RAG, Audit
-│   │   ├── routers/        # Auth, Meetings, Audio, Attendance, Chat, Analytics, Audit, Translation
-│   │   ├── models.py       # SQLAlchemy Schema definitions
-│   │   ├── schemas.py      # Pydantic Schemas
-│   │   ├── main.py         # FastAPI Entrypoint
-│   │   └── seed_data.py    # Database Seeder
-│   ├── tests/              # API and RAG Pytests
-│   ├── Dockerfile
+│   │   ├── core/           # Configuration, Database Sessions, Pydantic Settings
+│   │   ├── services/       # Multi-Signal Diarization Engine, Audio Preprocessor, ASR Aligner, RAG
+│   │   ├── routers/        # Auth, Meetings, Action Items, Decisions, Audio, Minutes, Translation, Search, Analytics, Audit
+│   │   ├── models.py       # SQLAlchemy Schema (Organization, Department, Decision, ActionItem, MinutesVersion)
+│   │   ├── schemas.py      # Pydantic Schemas & Data Transfer Objects
+│   │   ├── main.py         # FastAPI Entrypoint & Router Registry
+│   │   └── seed_data.py    # Database Seeder (Organizations, Decisions, Action Items)
+│   ├── tests/              # Pytest Backend Unit & Integration Suite
 │   └── requirements.txt
+├── benchmarks/
+│   ├── speaker_change_cases/# 12 Controlled Diarization Benchmark Scenarios
+│   └── evaluate.py         # Standardized DER & Diarization Scorecard Evaluator
 ├── frontend/
-│   ├── app/                # Next.js App Router pages and layouts
-│   │   ├── components/     # DevToolsProtector, AudioPlayer, Navbar, Modals
-│   │   ├── record/         # Live Meeting Recorder View
-│   │   ├── verify/         # Side-by-side Human-in-the-Loop Review Editor
-│   │   ├── attendance/     # Role-Based Meeting Attendance & Pass Kiosk
-│   │   └── analytics/      # Department & Budget Analytics
-│   ├── tailwind.config.js  # Custom Tokens & Dark Mode Theme
-│   ├── next.config.js      # Production Security Headers
-│   ├── tsconfig.json
-│   └── Dockerfile
-├── docker-compose.yml      # Multi-container service definitions
+│   ├── app/                # Next.js App Router pages
+│   │   ├── action-items/   # Action Items Execution Dashboard
+│   │   ├── decisions/      # Corporate Decision Register
+│   │   ├── meetings/       # Meeting Schedule & Live Launcher Registry
+│   │   ├── verify/         # Review & Sign Studio & Speaker Timeline
+│   │   ├── components/     # SpeakerTimelineView, LiveMeetingCaptureView, AuthView
+│   │   ├── lib/            # API client bindings & Translation dictionary
+│   │   └── layout.tsx      # Main layout with single-page tab navigation
+│   ├── tailwind.config.js  # Theme Tokens & Dark Mode Config
+│   └── next.config.mjs     # Security Headers & Next.js Build Settings
+├── docker-compose.yml      # Multi-container orchestration
 └── README.md
 ```
 
 ---
 
-## Core Features
+## ✨ Key Enterprise Capabilities
 
-1. **Corporate RBAC & HttpOnly Authentication**: Implements JSON Web Tokens (JWT) issued via secure HttpOnly cookies for Roles: `System Admin`, `CEO`, `Manager`, and `Employee`.
-2. **PyAnnote Speaker Diarization & Overlap Tagging**: Employs `pyannote/speaker-diarization-3.1` as primary diarization engine with overlap detection (`overlapping=True`), keeping MFCC clustering as `LEGACY_DIARIZATION=true` fallback.
-3. **Multi-Engine ASR (Whisper / Bhashini / MMS)**: Transcribes meeting audio using local `openai/whisper-small` or MeitY's official **Bhashini ASR API** with fallback to Meta MMS-1B.
-4. **Post-ASR Transcript Normalization & Polishing**: Automatically filters speech stutters, vocal fillers (`um`, `uh`, `like`, `you know`), restores proper punctuation, and normalizes grammar.
-5. **Dynamic Indic NMT Translation**: Live neural machine translation of summaries, agendas, and diarized transcript segments into Hindi (हिंदी), Marathi (मराठी), Telugu (తెలుగు), and English.
-6. **Attendance Verification (GPS Geofence + QR Pass)**: Validates mobile check-ins using Haversine formula distance verification from Corporate Headquarters.
-7. **AI Minutes Extraction & Faithfulness Guardrails**: Extracts structured executive summaries, key topics, decisions, issues & risks, follow-ups, and financial allocations with embedding-similarity faithfulness validation (`unverified=True` flags).
-8. **Side-by-side Verification Editor**: Allows Meeting Hosts and Managers to review, edit, and align transcript dialogue turns before executive sign-off.
-9. **Cryptographic SHA256 Audit Trail & Public Verifier**: Computes an immutable SHA256 digital signature hash in the audit log ledger with a public verification endpoint (`GET /api/v1/audit/verify/{meeting_id}`).
-10. **RAG Semantic Search Chatbot & Grounding Guarantees**: Employs Sentence Transformers and vector similarity indexes to fetch past meeting resolutions with exact chunk citations and similarity thresholding.
-11. **Corporate Analytics Dashboard**: Visual metrics displaying department representation, speaking time distribution, action item statuses, and budget allocations.
-12. **Client UX Protections & Data Privacy**: Features client UX protections (`DevToolsProtector`), CORS restrictions, security HTTP headers (`HSTS`, `X-Frame-Options`), and DPDP Act 2023 compliance (`PRIVACY.md`).
+### 1. 🧠 Multi-Signal Speaker Diarization Engine (`diarization_engine.py`)
+- **7-Signal Decision Matrix**: Computes speaker transitions using `Embedding Discontinuity`, `Local Acoustic Boundary`, `Energy Transition`, `VAD Signal`, `Speaker Profile Distance`, `Temporal Consistency`, and `Cluster Consistency`.
+- **Adaptive Threshold Calibration**: Dynamically computes meeting-specific acoustic thresholds ($\mu + k \cdot \sigma$) to handle noisy boardrooms or virtual calls.
+- **Temporal Confirmation**: Classifies transition boundaries into `CONFIRMED` ($\ge 85\%$), `PROBABLE` ($\ge 65\%$), or `UNCERTAIN` ($< 65\%$) to eliminate false speaker changes during pauses.
+- **Centroid Profile Memory**: Maintains long-term speaker centroid vectors to correctly track speaker re-entry ($A \rightarrow B \rightarrow A$) even after 60+ seconds of silence.
 
 ---
 
-## Getting Started (Commands to Run)
-
-### Option 1: Running Locally with Python & Node.js
-
-#### 1. Backend Setup:
-```bash
-cd backend
-python3 -m venv ../venv
-source ../venv/bin/activate
-pip install -r requirements.txt
-
-# Run FastAPI server
-DATABASE_URL=sqlite:///./sql_app.db uvicorn app.main:app --port 8000 --reload
-```
-
-#### 2. Frontend Setup:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Access the application at `http://localhost:3000`.
+### 2. 🎯 Action Items Execution Dashboard (`/action-items`)
+- **Kanban & List Matrix**: Sorts deliverables into `To Do`, `In Progress`, `Completed`, and `Overdue`.
+- **Source Evidence Jumping**: Every task card includes a **`🔍 View Source Evidence`** link that jumps directly to the exact meeting ID and audio timestamp where the action item was assigned.
+- **Priority & Confidence Badges**: Tracks priority (`HIGH`, `MEDIUM`, `LOW`), owner assignment, department, and AI extraction confidence score ($95\%$).
 
 ---
 
-### Option 2: Running via Docker Compose
-
-From the root project directory, run:
-```bash
-docker-compose up --build
-```
-This builds and launches:
-- **PostgreSQL** on port `5432`
-- **FastAPI Backend** on port `8000` (Swagger docs at `http://localhost:8000/docs`)
-- **Next.js Frontend** on port `3000`
-
-To seed sample corporate data:
-```bash
-docker-compose exec backend python app/seed_data.py
-```
+### 3. 📜 Corporate Decision Register (`/decisions`)
+- **Governance Ledger**: Tracks executive architectural, financial, policy, and operational sign-offs.
+- **Rationale & Signatories**: Displays decision statements, underlying rationale, impact level, and verified signatories.
+- **Source Verification**: 1-click jump to transcript segment and speaker audio source.
 
 ---
 
-## Verification & Testing
+### 4. 🔬 "Why Speaker Change?" Diarization Diagnostic Inspector
+- **Explainable Diarization UI**: Interactive **`💡 Why Speaker Change?`** button in `SpeakerTimelineView.tsx` (`/verify`).
+- **7-Signal Progress Gauges**: Displays dynamic engine sub-scores for embedding discontinuity, acoustic spectral boundary, VAD transition, energy shift, profile mismatch, and cluster consistency.
 
-To execute the automated test suite:
+---
+
+### 5. 🔒 Cryptographic SHA-256 Audit Hash Chain
+- **Chained Hashing**: Enforces audit log hashing where `hash_n = SHA256(record_n + hash_{n-1})`.
+- **Public Verifier Endpoint**: `GET /api/v1/audit/verify/{meeting_id}` recomputes the entire audit trail and flags any historical tampering.
+
+---
+
+### 6. 🔍 Global Enterprise Search (`/search?query=...`)
+- **Cross-Entity Search**: Queries Decisions, Action Items, Meetings, Transcripts, and RAG vector store simultaneously.
+- **Structured Response**: Returns categorized results with timestamp links and evidence quotes.
+
+---
+
+## 🧪 Benchmark Suite & Evaluation
+
+Run the 12 controlled diarization benchmark cases:
+```bash
+PYTHONPATH=backend ./venv/bin/python benchmarks/evaluate.py
+```
+
+Run the backend Pytest unit and integration test suite:
 ```bash
 PYTHONPATH=backend ./venv/bin/pytest backend/tests -v
 ```
+
+---
+
+## 🚀 Quickstart Guide
+
+### 1. Launch FastAPI Backend
+```bash
+cd backend
+PYTHONPATH=backend ./venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+API Documentation available at: `http://localhost:8000/docs`
+
+### 2. Launch Next.js Frontend
+```bash
+cd frontend
+npm run dev
+```
+Web Platform available at: `http://localhost:3000`

@@ -3,6 +3,31 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
 
+class Organization(Base):
+    __tablename__ = "organizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    code = Column(String, unique=True, index=True, nullable=False)
+    domain = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    departments = relationship("Department", back_populates="organization")
+    users = relationship("User", back_populates="organization")
+    meetings = relationship("Meeting", back_populates="organization")
+
+class Department(Base):
+    __tablename__ = "departments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    name = Column(String, nullable=False)
+    code = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    organization = relationship("Organization", back_populates="departments")
+    users = relationship("User", back_populates="department")
+
 class User(Base):
     __tablename__ = "users"
 
@@ -10,8 +35,10 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, default="Employee")  # System Admin, CEO, Manager, Employee
+    role = Column(String, default="Employee")  # System Admin, CEO, Manager, Employee, SUPER_ADMIN, ORG_ADMIN, HOST, REVIEWER, PARTICIPANT, AUDITOR
     full_name = Column(String)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
     age = Column(Integer)
     gender = Column(String)  # Male, Female, Other
     social_category = Column(String)  # General, OBC, SC, ST
@@ -21,6 +48,8 @@ class User(Base):
     state = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    organization = relationship("Organization", back_populates="users")
+    department = relationship("Department", back_populates="users")
     meetings = relationship("Meeting", back_populates="secretary", foreign_keys="Meeting.secretary_id")
     attendance = relationship("Attendance", back_populates="user")
     audit_logs = relationship("AuditLog", back_populates="user")
@@ -45,6 +74,7 @@ class Meeting(Base):
     agenda = Column(Text)
     agenda_pdf_url = Column(String)
     qr_code_data = Column(String)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     secretary_id = Column(Integer, ForeignKey("users.id"))
     chairperson_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     audio_url = Column(String)
@@ -54,13 +84,16 @@ class Meeting(Base):
     finalized_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    organization = relationship("Organization", back_populates="meetings")
     secretary = relationship("User", back_populates="meetings", foreign_keys=[secretary_id])
     chairperson = relationship("User", foreign_keys=[chairperson_id])
     finalized_by = relationship("User", foreign_keys=[finalized_by_id])
     attendance = relationship("Attendance", back_populates="meeting")
     transcripts = relationship("Transcript", back_populates="meeting", uselist=False)
     minutes = relationship("Minutes", back_populates="meeting", uselist=False)
+    minutes_versions = relationship("MinutesVersion", back_populates="meeting")
     action_items = relationship("ActionItem", back_populates="meeting")
+    decisions = relationship("Decision", back_populates="meeting")
     votes = relationship("Vote", back_populates="meeting")
     audit_logs = relationship("AuditLog", back_populates="meeting")
     translations = relationship("Translation", back_populates="meeting")
@@ -113,6 +146,7 @@ class Minutes(Base):
     financial_information = Column(JSON) # List of financial objects (optional)
     additional_notes = Column(Text)
     version_number = Column(Integer, default=1)
+    status = Column(String, default="DRAFT")  # DRAFT, UNDER_REVIEW, APPROVED, FINALIZED, SHA_256_SEALED
     digital_hash = Column(String)
     approved_by_id = Column(Integer, ForeignKey("users.id"))
     approved_at = Column(DateTime)
@@ -120,22 +154,75 @@ class Minutes(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     meeting = relationship("Meeting", back_populates="minutes")
+    versions = relationship("MinutesVersion", back_populates="minutes")
+
+class MinutesVersion(Base):
+    __tablename__ = "minutes_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    minutes_id = Column(Integer, ForeignKey("minutes.id"), nullable=False)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    version_number = Column(Integer, nullable=False)
+    status = Column(String, default="DRAFT")
+    summary = Column(Text)
+    topics = Column(JSON)
+    decisions = Column(JSON)
+    action_items = Column(JSON)
+    changes_summary = Column(Text)
+    edited_by_id = Column(Integer, ForeignKey("users.id"))
+    digital_hash = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    minutes = relationship("Minutes", back_populates="versions")
+    meeting = relationship("Meeting", back_populates="minutes_versions")
+    edited_by = relationship("User", foreign_keys=[edited_by_id])
+
+class Decision(Base):
+    __tablename__ = "decisions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    decision_text = Column(Text, nullable=False)
+    rationale = Column(Text, nullable=True)
+    impact_level = Column(String, default="MEDIUM")       # HIGH, MEDIUM, LOW
+    category = Column(String, default="Architecture")      # Architecture, Financial, Policy, Operations, Strategy, HR
+    status = Column(String, default="APPROVED")            # DRAFT, REVIEW, APPROVED, FINALIZED, SEALED
+    source_segment_id = Column(Integer, nullable=True)
+    source_timestamp = Column(Float, default=0.0)
+    source_speaker = Column(String, nullable=True)
+    evidence_text = Column(Text, nullable=True)
+    confidence = Column(Float, default=0.92)
+    participants = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    meeting = relationship("Meeting", back_populates="decisions")
+    action_items = relationship("ActionItem", back_populates="decision")
 
 class ActionItem(Base):
     __tablename__ = "action_items"
 
     id = Column(Integer, primary_key=True, index=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
     meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    decision_id = Column(Integer, ForeignKey("decisions.id"), nullable=True)
     title = Column(String, nullable=False)
     description = Column(Text)
     owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=True) # Linked app user (optional)
     responsible_person = Column(String)                                  # Plain text owner fallback
     department = Column(String)
     deadline = Column(DateTime)
-    status = Column(String, default="pending")                           # pending, in_progress, completed
+    priority = Column(String, default="MEDIUM")                          # HIGH, MEDIUM, LOW
+    status = Column(String, default="TO_DO")                             # TO_DO, IN_PROGRESS, COMPLETED, OVERDUE
+    source_segment_id = Column(Integer, nullable=True)
+    source_timestamp = Column(Float, default=0.0)
+    source_speaker = Column(String, nullable=True)
+    evidence_text = Column(Text, nullable=True)
+    confidence = Column(Float, default=0.94)
     source_segments = Column(JSON)                                       # List of segment IDs
 
     meeting = relationship("Meeting", back_populates="action_items")
+    decision = relationship("Decision", back_populates="action_items")
     owner_user = relationship("User", foreign_keys=[owner_user_id])
 
 class Vote(Base):

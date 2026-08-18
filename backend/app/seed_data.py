@@ -264,6 +264,136 @@ def seed_db():
             )
             print("Seeded meeting: Core API & Infrastructure Architecture Sync")
 
+            # Seed Organization & Departments if missing
+            org = db.query(models.Organization).filter(models.Organization.code == "ACME").first()
+            if not org:
+                org = models.Organization(name="Acme Global Enterprise", code="ACME", domain="enterprise.ai")
+                db.add(org)
+                db.commit()
+                db.refresh(org)
+
+                dept_eng = models.Department(organization_id=org.id, name="Engineering & Architecture", code="ENG")
+                dept_sec = models.Department(organization_id=org.id, name="Security & Compliance", code="SEC")
+                dept_exec = models.Department(organization_id=org.id, name="Executive Leadership", code="EXEC")
+                db.add_all([dept_eng, dept_sec, dept_exec])
+                db.commit()
+
+            # Seed Decisions for Meeting 1 & Meeting 2 if missing
+            if db.query(models.Decision).count() == 0:
+                dec1 = models.Decision(
+                    organization_id=org.id,
+                    meeting_id=1,
+                    decision_text="Approve GPU cluster expansion budget of $120,000 for Q3 AI model fine-tuning.",
+                    rationale="High model throughput demands require scaling GPU nodes to prevent diarization bottlenecks.",
+                    impact_level="HIGH",
+                    category="Financial",
+                    status="SEALED",
+                    source_timestamp=45.2,
+                    source_speaker="Rajendra Prasad (CEO)",
+                    evidence_text="GPU budget is approved up to $120k for Q3 AI scaling.",
+                    confidence=0.96,
+                    participants=["Rajendra Prasad", "Vikramaditya Rao", "Ananya Roy"]
+                )
+                dec2 = models.Decision(
+                    organization_id=org.id,
+                    meeting_id=2,
+                    decision_text="Adopt microservices architecture for OAuth2 & single-sign-on auth service.",
+                    rationale="Decoupling authentication from core API server improves availability and security compliance.",
+                    impact_level="HIGH",
+                    category="Architecture",
+                    status="APPROVED",
+                    source_timestamp=12.8,
+                    source_speaker="Rahul Sharma (Host)",
+                    evidence_text="Proceed with OAuth2 microservice staging deployment.",
+                    confidence=0.94,
+                    participants=["Rahul Sharma", "Priya Mehta", "Alex Johnson"]
+                )
+                dec3 = models.Decision(
+                    organization_id=org.id,
+                    meeting_id=1,
+                    decision_text="Enforce mandatory SHA-256 cryptographic audit sealing on all executive meeting minutes.",
+                    rationale="Required by SOC2 Type II compliance standards and corporate governance policies.",
+                    impact_level="MEDIUM",
+                    category="Policy",
+                    status="SEALED",
+                    source_timestamp=98.5,
+                    source_speaker="Vikramaditya Rao (System Admin)",
+                    evidence_text="Every finalized meeting document must contain an immutable SHA-256 digital signature.",
+                    confidence=0.98,
+                    participants=["Vikramaditya Rao", "Priya Mehta"]
+                )
+                db.add_all([dec1, dec2, dec3])
+                db.commit()
+
+            # Seed Action Items for Action Items Dashboard
+            if db.query(models.ActionItem).count() < 4:
+                act_items = [
+                    models.ActionItem(
+                        organization_id=org.id,
+                        meeting_id=1,
+                        decision_id=dec1.id,
+                        title="Procure H100 GPU Server Cluster Infrastructure",
+                        description="Issue RFP and finalize cloud provider agreement for 8x H100 node cluster.",
+                        responsible_person="Alex Johnson",
+                        department="Engineering & Architecture",
+                        deadline=datetime.now() + timedelta(days=10),
+                        priority="HIGH",
+                        status="IN_PROGRESS",
+                        source_timestamp=52.0,
+                        source_speaker="Alex Johnson",
+                        evidence_text="Alex will lead procurement for the 8x H100 node cluster.",
+                        confidence=0.95
+                    ),
+                    models.ActionItem(
+                        organization_id=org.id,
+                        meeting_id=2,
+                        decision_id=dec2.id,
+                        title="Submit OAuth2 Security & Penetration Audit Report",
+                        description="Complete vulnerability scan and upload compliance sign-off document.",
+                        responsible_person="Priya Mehta",
+                        department="Security & Compliance",
+                        deadline=datetime.now() + timedelta(days=3),
+                        priority="HIGH",
+                        status="TO_DO",
+                        source_timestamp=22.5,
+                        source_speaker="Priya Mehta",
+                        evidence_text="I will submit the security audit report by Friday.",
+                        confidence=0.96
+                    ),
+                    models.ActionItem(
+                        organization_id=org.id,
+                        meeting_id=1,
+                        title="Benchmark Multi-Signal Diarization Engine Accuracy",
+                        description="Run DER evaluation script on 12 controlled test scenarios.",
+                        responsible_person="Ananya Roy",
+                        department="Engineering & Architecture",
+                        deadline=datetime.now() - timedelta(days=2),
+                        priority="MEDIUM",
+                        status="COMPLETED",
+                        source_timestamp=110.0,
+                        source_speaker="Ananya Roy",
+                        evidence_text="Evaluation on 12 benchmark cases completed with 0.0% DER.",
+                        confidence=0.99
+                    ),
+                    models.ActionItem(
+                        organization_id=org.id,
+                        meeting_id=2,
+                        title="Finalize PostgreSQL Indexes for Meetings & Actions Tables",
+                        description="Verify query performance under 100,000 active meeting records.",
+                        responsible_person="Rahul Sharma",
+                        department="Engineering & Architecture",
+                        deadline=datetime.now() - timedelta(days=1),
+                        priority="HIGH",
+                        status="OVERDUE",
+                        source_timestamp=35.0,
+                        source_speaker="Alex Johnson",
+                        evidence_text="Database indexing on meetings and action_items tables requires load verification.",
+                        confidence=0.91
+                    )
+                ]
+                db.add_all(act_items)
+                db.commit()
+
     except Exception as e:
         db.rollback()
         print(f"Error during seeding: {str(e)}")

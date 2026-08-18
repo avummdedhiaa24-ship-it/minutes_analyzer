@@ -64,15 +64,62 @@ class ActionItemBase(BaseModel):
     responsible_person: Optional[str] = None
     department: Optional[str] = None
     deadline: Optional[datetime] = None
-    status: str = "pending"
+    priority: str = "MEDIUM"
+    status: str = "TO_DO"
+    source_segment_id: Optional[int] = None
+    source_timestamp: float = 0.0
+    source_speaker: Optional[str] = None
+    evidence_text: Optional[str] = None
+    confidence: float = 0.94
+    decision_id: Optional[int] = None
     source_segments: Optional[List[str]] = None
 
 class ActionItemCreate(ActionItemBase):
-    pass
+    meeting_id: Optional[int] = None
+
+class ActionItemUpdate(BaseModel):
+    title: Optional[str] = None
+    responsible_person: Optional[str] = None
+    status: Optional[str] = None
+    priority: Optional[str] = None
+    deadline: Optional[datetime] = None
 
 class ActionItemResponse(ActionItemBase):
     id: int
     meeting_id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+# Decision Schemas
+class DecisionBase(BaseModel):
+    decision_text: str
+    rationale: Optional[str] = None
+    impact_level: str = "MEDIUM"
+    category: str = "Architecture"
+    status: str = "APPROVED"
+    source_segment_id: Optional[int] = None
+    source_timestamp: float = 0.0
+    source_speaker: Optional[str] = None
+    evidence_text: Optional[str] = None
+    confidence: float = 0.92
+    participants: Optional[List[str]] = None
+
+class DecisionCreate(DecisionBase):
+    meeting_id: int
+
+class DecisionUpdate(BaseModel):
+    decision_text: Optional[str] = None
+    rationale: Optional[str] = None
+    impact_level: Optional[str] = None
+    status: Optional[str] = None
+
+class DecisionResponse(DecisionBase):
+    id: int
+    meeting_id: int
+    organization_id: Optional[int] = None
+    created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

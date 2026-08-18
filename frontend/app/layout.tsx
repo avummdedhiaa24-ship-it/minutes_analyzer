@@ -16,7 +16,9 @@ import {
   Moon,
   LogOut,
   Globe,
-  Radio
+  Radio,
+  CheckSquare,
+  Scale
 } from "lucide-react";
 import AuthView from "./components/AuthView";
 import DevToolsProtector from "./components/DevToolsProtector";
@@ -109,20 +111,22 @@ export default function RootLayout({
   const getRoleAllowedTabs = (role: string): string[] => {
     switch (role) {
       case "Employee":
-        return ["dashboard", "meetings", "attendance", "chat"];
+        return ["dashboard", "meetings", "action-items", "attendance", "chat"];
       case "Manager":
-        return ["dashboard", "meetings", "attendance", "live", "record", "verify", "chat"];
+        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "record", "verify", "chat"];
       case "CEO":
-        return ["dashboard", "meetings", "attendance", "live", "verify", "audit", "chat"];
+        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "verify", "audit", "chat"];
       case "System Admin":
       default:
-        return ["dashboard", "meetings", "attendance", "live", "record", "verify", "chat", "citizen", "audit"];
+        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "record", "verify", "chat", "citizen", "audit"];
     }
   };
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "meetings", label: "Meetings & Registry", icon: Calendar },
+    { id: "action-items", label: "Action Items Dashboard", icon: CheckSquare },
+    { id: "decisions", label: "Decision Register", icon: Scale },
     { id: "attendance", label: "Attendance Portal", icon: UserCheck },
     { id: "live", label: "Live Meeting Recording", icon: Radio },
     { id: "record", label: "Record / ASR Uploader", icon: Mic },

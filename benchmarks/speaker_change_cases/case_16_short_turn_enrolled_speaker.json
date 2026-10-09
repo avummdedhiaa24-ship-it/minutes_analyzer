@@ -1,0 +1,62 @@
+{
+  "scenario_id": "case_16_short_turn_enrolled_speaker",
+  "description": "Short 1-second enrolled turn ('Agreed.') between long speaker turns is preserved without false merging",
+  "audio_duration_seconds": 15.0,
+  "enrolled_profiles": [
+    {
+      "display_name": "Avumm (Host)",
+      "role": "Meeting Host",
+      "department": "Engineering"
+    },
+    {
+      "display_name": "Shyam (Dev)",
+      "role": "Developer",
+      "department": "Engineering"
+    }
+  ],
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Avumm (Host)",
+        "start": 0.0,
+        "end": 6.0,
+        "text": "We should deploy the API gateway changes to production tomorrow.",
+        "identity_confidence": 0.96,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Shyam (Dev)",
+        "start": 6.2,
+        "end": 7.5,
+        "text": "Agreed.",
+        "identity_confidence": 0.91,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Avumm (Host)",
+        "start": 7.8,
+        "end": 15.0,
+        "text": "Perfect, let us schedule the deployment window for 09:00 AM.",
+        "identity_confidence": 0.95,
+        "classification_status": "MATCHED_SPEAKER"
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 6.2,
+        "from_speaker": "Avumm (Host)",
+        "to_speaker": "Shyam (Dev)",
+        "confidence": 0.90,
+        "classification": "CONFIRMED"
+      },
+      {
+        "timestamp": 7.8,
+        "from_speaker": "Shyam (Dev)",
+        "to_speaker": "Avumm (Host)",
+        "confidence": 0.92,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

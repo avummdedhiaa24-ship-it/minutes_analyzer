@@ -2,14 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Calendar, Building2, ShieldCheck, FileText, ArrowLeft } from "lucide-react";
-import { recordingApi } from "../../lib/api";
+import { Users, Calendar, Building2, ShieldCheck, FileText, ArrowLeft, AlertCircle, UploadCloud, RefreshCw, Sparkles, FileAudio } from "lucide-react";
+import { recordingApi, audioApi } from "../../lib/api";
 import RecordingConsentModal, { AudioCaptureMode } from "./RecordingConsentModal";
 import RecordingControls from "./RecordingControls";
 import RecordingStatus from "./RecordingStatus";
 import LiveTranscript from "./LiveTranscript";
 import ProcessingStatus from "./ProcessingStatus";
 import MeetingMarkers from "./MeetingMarkers";
+import ScreenCaptureOCR from "./ScreenCaptureOCR";
 
 interface MeetingDetails {
   id: number;
@@ -42,6 +43,11 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
   const [receivedChunksCount, setReceivedChunksCount] = useState(0);
   const [fileSizeBytes, setFileSizeBytes] = useState(0);
 
+  const [permissionError, setPermissionError] = useState<string | null>(null);
+  const [uploadingAudio, setUploadingAudio] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const [transcriptSegments, setTranscriptSegments] = useState<any[]>(
     meeting.transcripts?.diarized_json || []
   );
@@ -53,11 +59,14 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
     can_retry: false
   });
 
+  const [displayStream, setDisplayStream] = useState<MediaStream | null>(null);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sequenceCounterRef = useRef<number>(1);
   const timerIntervalRef = useRef<any>(null);
+  const pendingChunkUploadsRef = useRef<Promise<any>[]>([]);
 
   // Poll processing status if in progress
   useEffect(() => {
@@ -69,18 +78,22 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
           setProcessingDetails(st);
           setProcessingStatus(st.processing_status);
           setMeetingStatus(st.meeting_status);
-          if (st.processing_status === "completed" || st.processing_status.includes("failed")) {
+          if (st.processing_status === "completed" || st.meeting_status === "minutes_ready") {
+            clearInterval(interval);
+            // Automatically navigate to Minutes Verification Studio when ready
+            router.push(`/verify?meeting_id=${meeting.id}`);
+          } else if (st.processing_status.includes("failed")) {
             clearInterval(interval);
           }
         } catch (e) {
           console.error("Status poll error:", e);
         }
-      }, 3000);
+      }, 1500);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [meeting.id, meetingStatus, processingStatus, token]);
+  }, [meeting.id, meetingStatus, processingStatus, token, router]);
 
   // Load initial markers
   useEffect(() => {
@@ -110,8 +123,14 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
     setShowConsentModal(false);
 
     try {
-      // 1. Request local microphone access
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // 1. Request local microphone access with shared WebRTC constraints so Google Meet / Zoom can read mic concurrently
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
       let finalStream: MediaStream = micStream;
 
       // 2. If Full Online Meeting mode selected, capture display/tab audio (others speaking in Meet/Zoom/Teams)
@@ -138,8 +157,8 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
 
             finalStream = dest.stream;
 
-            // Stop unused display video tracks to conserve resources
-            displayStream.getVideoTracks().forEach((track) => track.stop());
+            // Preserve displayStream for in-memory Screen OCR
+            setDisplayStream(displayStream);
           }
         } catch (displayErr: any) {
           console.warn("Display audio capture prompt dismissed/denied, continuing with local microphone:", displayErr);
@@ -158,23 +177,96 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
       mediaRecorderRef.current = recorder;
       sequenceCounterRef.current = 1;
 
-      recorder.ondataavailable = async (event: BlobEvent) => {
+      recorder.ondataavailable = (event: BlobEvent) => {
         if (event.data && event.data.size > 0) {
           const seq = sequenceCounterRef.current++;
-          try {
-            const uploadRes = await recordingApi.uploadChunk(meeting.id, seq, event.data, undefined, token);
-            setReceivedChunksCount(uploadRes.received_total_chunks);
-            setFileSizeBytes(uploadRes.total_bytes);
-          } catch (uploadErr) {
-            console.warn(`Chunk ${seq} upload deferred:`, uploadErr);
-          }
+          const uploadPromise = recordingApi.uploadChunk(meeting.id, seq, event.data, undefined, token)
+            .then((uploadRes) => {
+              setReceivedChunksCount(uploadRes.received_total_chunks);
+              setFileSizeBytes(uploadRes.total_bytes);
+            })
+            .catch((uploadErr) => {
+              console.warn(`Chunk ${seq} upload deferred:`, uploadErr);
+            });
+          pendingChunkUploadsRef.current.push(uploadPromise);
         }
       };
 
       recorder.start(3000); // Emits chunk every 3000ms
+      setPermissionError(null);
     } catch (err: any) {
-      alert(`Audio permission or recording initialization failed: ${err.message}`);
+      console.warn("Audio permission error:", err);
+      setPermissionError(err.message || "Microphone permission denied");
       setRecordingStatus("failed");
+    }
+  };
+
+  const handleAudioFileUpload = async (file: File) => {
+    setUploadingAudio(true);
+    setUploadProgress(`Uploading ${file.name} to meeting pipeline...`);
+    try {
+      await audioApi.upload(meeting.id, file, token);
+      setMeetingStatus("processing");
+      setProcessingStatus("processing_audio");
+      setRecordingStatus("completed");
+      setPermissionError(null);
+      setUploadProgress(null);
+    } catch (err: any) {
+      setUploadProgress(`Upload error: ${err.message}`);
+    } finally {
+      setUploadingAudio(false);
+    }
+  };
+
+  const handleLoadSampleAudio = async () => {
+    setUploadingAudio(true);
+    setUploadProgress("Loading sample multi-speaker discussion audio...");
+    try {
+      // Create a 16kHz mono synthetic PCM WAV sample buffer for instant testing
+      const numSeconds = 6;
+      const sampleRate = 16000;
+      const numSamples = numSeconds * sampleRate;
+      const buffer = new ArrayBuffer(44 + numSamples * 2);
+      const view = new DataView(buffer);
+
+      // RIFF identifier
+      view.setUint32(0, 0x52494646, false); // "RIFF"
+      view.setUint32(4, 36 + numSamples * 2, true);
+      view.setUint32(8, 0x57415645, false); // "WAVE"
+      view.setUint32(12, 0x666d7420, false); // "fmt "
+      view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+      view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+      view.setUint16(22, 1, true); // NumChannels (1 mono)
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true); // ByteRate
+      view.setUint16(32, 2, true); // BlockAlign
+      view.setUint16(34, 16, true); // BitsPerSample
+      view.setUint32(36, 0x64617461, false); // "data"
+      view.setUint32(40, numSamples * 2, true);
+
+      // Write subtle speech-like waveform tones
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const tone1 = Math.sin(2 * Math.PI * 220 * t);
+        const tone2 = Math.sin(2 * Math.PI * 440 * t) * 0.5;
+        const envelope = Math.sin(Math.PI * (i % 8000) / 8000);
+        const sample = Math.max(-1, Math.min(1, (tone1 + tone2) * envelope * 0.3));
+        view.setInt16(44 + i * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      }
+
+      const sampleBlob = new Blob([buffer], { type: "audio/wav" });
+      const sampleFile = new File([sampleBlob], "sample_meeting_discussion.wav", { type: "audio/wav" });
+
+      await audioApi.upload(meeting.id, sampleFile, token);
+      setMeetingStatus("processing");
+      setProcessingStatus("processing_audio");
+      setRecordingStatus("completed");
+      setPermissionError(null);
+      setUploadProgress(null);
+    } catch (err: any) {
+      setUploadProgress(`Demo sample error: ${err.message}`);
+    } finally {
+      setUploadingAudio(false);
     }
   };
 
@@ -195,11 +287,40 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
   };
 
   const handleEndMeeting = async () => {
+    // 1. Stop recorder with timeout protection so browser never hangs
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          if (!mediaRecorderRef.current || mediaRecorderRef.current.state === "inactive") {
+            resolve();
+            return;
+          }
+          mediaRecorderRef.current.onstop = () => resolve();
+          try {
+            mediaRecorderRef.current.stop();
+          } catch (e) {
+            resolve();
+          }
+        }),
+        new Promise<void>((resolve) => setTimeout(resolve, 800))
+      ]);
     }
+
+    // 2. Stop media tracks
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+    }
+    if (displayStream) {
+      displayStream.getTracks().forEach((track) => track.stop());
+      setDisplayStream(null);
+    }
+
+    // 3. Await all in-flight chunk upload requests with timeout protection
+    if (pendingChunkUploadsRef.current.length > 0) {
+      await Promise.race([
+        Promise.allSettled(pendingChunkUploadsRef.current),
+        new Promise<void>((resolve) => setTimeout(resolve, 1500))
+      ]);
     }
 
     try {
@@ -281,6 +402,80 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
         )}
       </div>
 
+      {/* Permission Denied Recovery Banner */}
+      {permissionError && (
+        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 animate-in fade-in slide-in-from-top-2 space-y-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+            <div className="space-y-1">
+              <h4 className="font-semibold text-amber-300 text-sm">
+                Microphone Permission Blocked or Denied ({permissionError})
+              </h4>
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                Your browser blocked microphone access. To fix this:
+                <br />
+                1. Look at your browser address bar at <code className="bg-amber-950/60 px-1.5 py-0.5 rounded text-amber-300">localhost:3000</code>.
+                <br />
+                2. Click the <strong>sliders/padlock icon</strong> on the left $\rightarrow$ Set <strong>Microphone</strong> to <strong>Allow</strong>.
+                <br />
+                3. On macOS, ensure <strong>System Settings &gt; Privacy &amp; Security &gt; Microphone</strong> is enabled for your browser.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <button
+              onClick={() => {
+                setPermissionError(null);
+                setRecordingStatus("not_started");
+                handleInitiateStart();
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-sm"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              Try Microphone Again
+            </button>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAudio}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm"
+            >
+              <UploadCloud className="w-3.5 h-3.5" />
+              Upload Audio File Instead
+            </button>
+
+            <button
+              onClick={handleLoadSampleAudio}
+              disabled={uploadingAudio}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Load Sample Audio (1-Click Demo)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden File Input for Audio Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="audio/*,.wav,.mp3,.m4a,.webm,.ogg"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleAudioFileUpload(file);
+        }}
+      />
+
+      {uploadProgress && (
+        <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-2 animate-pulse">
+          <FileAudio className="w-4 h-4 text-blue-400" />
+          {uploadProgress}
+        </div>
+      )}
+
       {/* Recording Status Bar */}
       <RecordingStatus
         recordingStatus={recordingStatus}
@@ -289,15 +484,43 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
         fileSizeBytes={fileSizeBytes}
       />
 
-      {/* Controls Bar */}
-      <RecordingControls
-        recordingStatus={recordingStatus}
-        onStart={handleInitiateStart}
-        onPause={handlePause}
-        onResume={handleResume}
-        onEndMeeting={handleEndMeeting}
-        onMarkMoment={handleMarkMoment}
-      />
+      {/* Controls Bar with Alternative Upload Option */}
+      <div className="space-y-2">
+        <RecordingControls
+          recordingStatus={recordingStatus}
+          onStart={handleInitiateStart}
+          onPause={handlePause}
+          onResume={handleResume}
+          onEndMeeting={handleEndMeeting}
+          onMarkMoment={handleMarkMoment}
+        />
+
+        {recordingStatus === "not_started" && !permissionError && (
+          <div className="flex items-center justify-between px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-500">
+            <span>Prefer to analyze an existing audio recording?</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingAudio}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 transition"
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-blue-500" />
+                Upload Audio File (.wav, .mp3, .m4a)
+              </button>
+              <button
+                type="button"
+                onClick={handleLoadSampleAudio}
+                disabled={uploadingAudio}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                Test with Sample Audio
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Processing Pipeline Progress Card */}
       {(meetingStatus === "processing" || processingStatus !== "idle") && (
@@ -323,6 +546,14 @@ export default function LiveMeetingCaptureView({ meeting, token }: Props) {
         </div>
 
         <div className="space-y-6">
+          {/* Ephemeral In-Memory Screen OCR, Attendee Recognition & Visual Diarization */}
+          <ScreenCaptureOCR
+            meetingId={meeting.id}
+            token={token}
+            recordingSeconds={durationSeconds}
+            externalStream={displayStream}
+          />
+
           <MeetingMarkers markers={markers} />
 
           <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3 text-xs">

@@ -64,7 +64,7 @@ export default function RecordingConsentModal({ isOpen, meetingTitle, onConfirm,
                 <span className="text-xs font-bold">Online Meeting Mode</span>
               </div>
               <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                Captures <strong>Others Speaking</strong> (Google Meet / Zoom / Teams tab audio) <strong>+ Your Microphone</strong> combined.
+                Captures <strong>Others Speaking</strong> in Meet/Zoom <strong>+ Your Microphone</strong> combined.
               </p>
             </button>
 
@@ -82,10 +82,37 @@ export default function RecordingConsentModal({ isOpen, meetingTitle, onConfirm,
                 <span className="text-xs font-bold">Room Microphone Only</span>
               </div>
               <p className="text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                Captures only your local room microphone (ideal for in-person conference room meetings).
+                For in-person meetings or speakers playing audio into the room.
               </p>
             </button>
           </div>
+        </div>
+
+        {/* Tab Audio Instructions Notice */}
+        {captureMode === "full_meeting" && (
+          <div className="mb-5 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 space-y-1">
+            <strong className="block text-blue-200">💡 Important for Google Meet / Zoom:</strong>
+            <p className="text-[11px] text-blue-300/90 leading-normal">
+              1. Use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (Safari blocks tab audio).<br />
+              2. When prompted, select <strong>"Chrome Tab"</strong> &amp; pick your <strong>Google Meet</strong> tab.<br />
+              3. Ensure <strong>☑ Share tab audio</strong> is checked at the bottom left.
+            </p>
+          </div>
+        )}
+
+        {/* Voice Calibration Option */}
+        <div className="mb-5 p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-purple-200 text-xs flex items-center gap-1.5">
+              🎙️ Enable Speaker Voice Calibration (Recommended)
+            </span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-500/20 text-purple-300 border border-purple-400/30">
+              High Accuracy Mode
+            </span>
+          </div>
+          <p className="text-[11px] text-purple-200/80 leading-normal">
+            Have each participant say a brief 3-second introduction (e.g. <em>"Hi, I am Rahul"</em>) at the start. The AI engine extracts their acoustic voiceprint &amp; pitch vector for <strong>near-100% precision speaker change detection</strong> during the meeting.
+          </p>
         </div>
 
         <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition mb-6">

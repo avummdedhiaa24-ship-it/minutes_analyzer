@@ -1,0 +1,47 @@
+{
+  "scenario_id": "case_17_unknown_speaker",
+  "description": "Un-enrolled guest participant speaking; system detects UNKNOWN_SPEAKER without forcing false enrolled match",
+  "audio_duration_seconds": 20.0,
+  "enrolled_profiles": [
+    {
+      "display_name": "Avumm (Host)",
+      "role": "Meeting Host",
+      "department": "Engineering"
+    },
+    {
+      "display_name": "Shyam (Dev)",
+      "role": "Developer",
+      "department": "Engineering"
+    }
+  ],
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Avumm (Host)",
+        "start": 0.0,
+        "end": 8.0,
+        "text": "Let us invite our guest auditor to provide feedback.",
+        "identity_confidence": 0.96,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Unknown Speaker 1",
+        "start": 8.0,
+        "end": 20.0,
+        "text": "Hello everyone, I am auditing the compliance trail for ISO 27001.",
+        "identity_confidence": 0.42,
+        "classification_status": "UNKNOWN_SPEAKER"
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 8.0,
+        "from_speaker": "Avumm (Host)",
+        "to_speaker": "Unknown Speaker 1",
+        "confidence": 0.90,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

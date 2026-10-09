@@ -93,46 +93,38 @@ export default function RootLayout({
   };
 
   const navigateTo = (tabName: string) => {
-    if (tabName === "live") {
-      setActiveTab("meetings");
-      window.history.pushState({}, "", "/meetings");
-      const navEvent = new PopStateEvent('popstate');
-      window.dispatchEvent(navEvent);
-      return;
-    }
+    const route = tabName === "dashboard" ? "/" : `/${tabName}`;
     setActiveTab(tabName);
-    window.history.pushState({}, "", `/${tabName === "dashboard" ? "" : tabName}`);
-    // Trigger custom popstate-like change for single-page routing mock
-    const navEvent = new PopStateEvent('popstate');
-    window.dispatchEvent(navEvent);
+    window.history.pushState({}, "", route);
+    window.dispatchEvent(new Event("popstate"));
   };
 
   // RBAC definitions for front-end modules
   const getRoleAllowedTabs = (role: string): string[] => {
     switch (role) {
       case "Employee":
-        return ["dashboard", "meetings", "action-items", "attendance", "chat"];
+        return ["dashboard", "meetings", "attendance", "transcript", "action-items", "verify", "chat"];
       case "Manager":
-        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "record", "verify", "chat"];
+        return ["dashboard", "meetings", "live", "attendance", "transcript", "action-items", "decisions", "verify", "voice-profiles", "chat", "audit"];
       case "CEO":
-        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "verify", "audit", "chat"];
+        return ["dashboard", "meetings", "live", "attendance", "transcript", "action-items", "decisions", "verify", "voice-profiles", "chat", "audit"];
       case "System Admin":
       default:
-        return ["dashboard", "meetings", "action-items", "decisions", "attendance", "live", "record", "verify", "chat", "citizen", "audit"];
+        return ["dashboard", "meetings", "live", "attendance", "transcript", "action-items", "decisions", "verify", "voice-profiles", "chat", "citizen", "audit"];
     }
   };
 
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "meetings", label: "Meetings & Registry", icon: Calendar },
-    { id: "action-items", label: "Action Items Dashboard", icon: CheckSquare },
-    { id: "decisions", label: "Decision Register", icon: Scale },
-    { id: "attendance", label: "Attendance Portal", icon: UserCheck },
-    { id: "live", label: "Live Meeting Recording", icon: Radio },
-    { id: "record", label: "Record / ASR Uploader", icon: Mic },
-    { id: "verify", label: "Review & Sign Studio", icon: FileCheck },
-    { id: "chat", label: "RAG Assistant", icon: MessageSquare },
-    { id: "citizen", label: "Participant Directory", icon: Search },
+    { id: "meetings", label: "Meetings", icon: Calendar },
+    { id: "live", label: "Live Capture", icon: Radio },
+    { id: "attendance", label: "Attendance", icon: UserCheck },
+    { id: "transcript", label: "Transcript", icon: MessageSquare },
+    { id: "action-items", label: "Action Items", icon: CheckSquare },
+    { id: "decisions", label: "Decisions", icon: Scale },
+    { id: "verify", label: "Meeting Minutes", icon: FileCheck },
+    { id: "voice-profiles", label: "Voice Profiles", icon: Mic },
+    { id: "chat", label: "RAG Assistant", icon: Search },
     { id: "audit", label: "Audit Ledger", icon: ShieldCheck }
   ];
 

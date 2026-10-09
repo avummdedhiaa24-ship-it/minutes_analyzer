@@ -1,0 +1,62 @@
+{
+  "scenario_id": "case_15_voice_reentry_after_60s",
+  "description": "Enrolled speaker A re-enters the meeting after a 60-second gap and is correctly identified using voice profile memory",
+  "audio_duration_seconds": 75.0,
+  "enrolled_profiles": [
+    {
+      "display_name": "Avumm (Host)",
+      "role": "Meeting Host",
+      "department": "Engineering"
+    },
+    {
+      "display_name": "Sagar (PM)",
+      "role": "Product Manager",
+      "department": "Product"
+    }
+  ],
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Avumm (Host)",
+        "start": 0.0,
+        "end": 10.0,
+        "text": "Sagar, please summarize the client feature requests.",
+        "identity_confidence": 0.95,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Sagar (PM)",
+        "start": 10.0,
+        "end": 65.0,
+        "text": "Clients requested dark mode customization, single sign-on integration, and exported PDF reports.",
+        "identity_confidence": 0.94,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Avumm (Host)",
+        "start": 65.0,
+        "end": 75.0,
+        "text": "Excellent, we will prioritize single sign-on for sprint 14.",
+        "identity_confidence": 0.94,
+        "classification_status": "MATCHED_SPEAKER"
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 10.0,
+        "from_speaker": "Avumm (Host)",
+        "to_speaker": "Sagar (PM)",
+        "confidence": 0.93,
+        "classification": "CONFIRMED"
+      },
+      {
+        "timestamp": 65.0,
+        "from_speaker": "Sagar (PM)",
+        "to_speaker": "Avumm (Host)",
+        "confidence": 0.94,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

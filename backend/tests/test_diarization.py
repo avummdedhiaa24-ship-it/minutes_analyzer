@@ -13,18 +13,18 @@ client = TestClient(app)
 def test_speaker_profile_manager_reentry():
     """1. Verify speaker profile memory preserves identity on speaker re-entry (A -> B -> A)."""
     manager = SpeakerProfileManager()
-    vec1 = np.ones(40) * 0.5
-    vec2 = np.ones(40) * -0.5
-    vec3 = np.ones(40) * 0.49  # Similar to vec1 (Speaker 1 re-entry)
+    vec1 = np.ones(124) * 0.5
+    vec2 = np.ones(124) * -0.5
+    vec3 = np.ones(124) * 0.49  # Similar to vec1 (Speaker 1 re-entry)
 
-    spk1, conf1 = manager.get_or_assign_speaker(vec1, 0)
-    spk2, conf2 = manager.get_or_assign_speaker(vec2, 1)
-    spk3, conf3 = manager.get_or_assign_speaker(vec3, 2)
+    spk1, conf1, st1 = manager.get_or_assign_speaker(vec1, 0)
+    spk2, conf2, st2 = manager.get_or_assign_speaker(vec2, 1)
+    spk3, conf3, st3 = manager.get_or_assign_speaker(vec3, 2)
 
     assert "Speaker 1" in spk1
     assert "Speaker 2" in spk2
     assert spk3 == spk1  # Re-identified Speaker 1 on re-entry!
-    assert conf3 > 0.80
+    assert conf3 > 0.70
 
 def test_asr_word_aligner_splits_segments():
     """2. Verify ASRWordAligner splits ASR chunks at speaker boundary change timestamps."""

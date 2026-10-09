@@ -14,6 +14,7 @@ officer_roles = ["System Admin", "CEO", "Manager", "Admin", "Secretary", "Depart
 is_officer = RoleChecker(officer_roles)
 
 @router.post("", response_model=schemas.MeetingResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=schemas.MeetingResponse, status_code=status.HTTP_201_CREATED)
 def create_meeting(
     meeting_in: schemas.MeetingCreate,
     db: Session = Depends(get_db),
@@ -46,6 +47,7 @@ def create_meeting(
     return meeting
 
 @router.get("", response_model=List[schemas.MeetingResponse])
+@router.get("/", response_model=List[schemas.MeetingResponse])
 def list_meetings(
     status: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -222,9 +224,27 @@ def reprocess_diarization(
 
     # Re-run pipeline diarization step without re-recording
     from app.services.ai_pipeline import ai_pipeline
-    from app.services.diarization_engine import multi_signal_diarization_engine
+    enrolled = db.query(models.CalibratedVoiceProfile).filter(
+        models.CalibratedVoiceProfile.meeting_id == meeting_id,
+        models.CalibratedVoiceProfile.consent_status == "CONSENT_GRANTED",
+        models.CalibratedVoiceProfile.is_active == True
+    ).all()
+    enrolled_list = [
+        {
+            "id": p.id,
+            "display_name": p.display_name,
+            "role": p.role,
+            "department": p.department,
+            "embedding_vector": p.embedding_vector
+        } for p in enrolled if p.embedding_vector
+    ]
 
-    raw_text, diarized = ai_pipeline.diarize_and_transcribe(meeting.audio_url, "en")
+    raw_text, diarized = ai_pipeline.diarize_and_transcribe(
+        meeting.audio_url,
+        "en",
+        enrolled_profiles=enrolled_list,
+        meeting_id=meeting_id
+    )
 
     if meeting.transcripts:
         meeting.transcripts.diarized_json = diarized

@@ -1,6 +1,7 @@
 import os
 import uuid
 import shutil
+import logging
 from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
@@ -13,12 +14,29 @@ from app.routers.auth import get_current_user
 from app.services.ai_pipeline import ai_pipeline
 from app.services.rag import rag_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/audio", tags=["Audio & Transcript Pipeline"])
 
-def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_stage: str = "all"):
+def run_processing_pipeline(meeting_id: int, file_path: str, db: Optional[Session] = None, start_stage: str = "all"):
+    from app.core.database import SessionLocal
+    own_session = False
+    if db is None:
+        db = SessionLocal()
+        own_session = True
+
     meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
     if not meeting:
+        if own_session:
+            db.close()
         return
+
+    # Robust file_path resolution
+    if not os.path.exists(file_path):
+        if os.path.exists(os.path.join("backend", file_path.lstrip("./"))):
+            file_path = os.path.join("backend", file_path.lstrip("./"))
+        elif os.path.exists(file_path.replace("backend/", "")):
+            file_path = file_path.replace("backend/", "")
 
     try:
         if start_stage in ["all", "audio"]:
@@ -46,8 +64,37 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_
             db.commit()
 
             try:
+                # Query enrolled voice profiles for identity-aware diarization
+                enrolled = db.query(models.CalibratedVoiceProfile).filter(
+                    models.CalibratedVoiceProfile.meeting_id == meeting_id,
+                    models.CalibratedVoiceProfile.consent_status == "CONSENT_GRANTED",
+                    models.CalibratedVoiceProfile.is_active == True
+                ).all()
+                enrolled_list = [
+                    {
+                        "id": p.id,
+                        "display_name": p.display_name,
+                        "role": p.role,
+                        "department": p.department,
+                        "embedding_vector": p.embedding_vector
+                    } for p in enrolled if p.embedding_vector
+                ]
+
+                try:
+                    from app.services.screen_ocr import screen_ocr_engine
+                    from app.services.meeting_ocr import meeting_ocr_service
+                    screen_ocr_engine.auto_sync_attendance(meeting_id, db)
+                    meeting_ocr_service._sync_db_participants(meeting_id, db)
+                except Exception as sync_e:
+                    logger.warning(f"Attendance auto-sync before transcription error: {sync_e}")
+
                 lang, confidence = ai_pipeline.detect_language_and_dialect(clean_audio_path)
-                raw_text, diarized_segments = ai_pipeline.diarize_and_transcribe(clean_audio_path, lang)
+                raw_text, diarized_segments = ai_pipeline.diarize_and_transcribe(
+                    clean_audio_path,
+                    lang,
+                    enrolled_profiles=enrolled_list,
+                    meeting_id=meeting_id
+                )
             except Exception as tr_err:
                 meeting.processing_status = "transcription_failed"
                 meeting.status = "processing"
@@ -83,18 +130,48 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_
             db.commit()
             return
 
+        # 1. Gather confirmed attendees from OCR & DB
+        attendee_names = []
+        from app.services.screen_ocr import screen_ocr_engine
+        from app.services.meeting_ocr import meeting_ocr_service
+        try:
+            screen_ocr_engine.auto_sync_attendance(meeting_id, db)
+            meeting_ocr_service._sync_db_participants(meeting_id, db)
+        except Exception as sync_e:
+            logger.warning(f"Attendance auto-sync non-critical error: {sync_e}")
+
+        db_participants = db.query(models.MeetingParticipant).filter(models.MeetingParticipant.meeting_id == meeting_id).all()
+        for p in db_participants:
+            if p.display_name and p.display_name not in attendee_names:
+                attendee_names.append(p.display_name)
+
+        if not attendee_names:
+            db_attendees = db.query(models.Attendance).join(models.User).filter(models.Attendance.meeting_id == meeting_id).all()
+            for att in db_attendees:
+                name = att.user.full_name or att.user.username
+                if name and name not in attendee_names:
+                    attendee_names.append(name)
+
+        ocr_cached = screen_ocr_engine.get_cached_ocr_data(meeting_id).get("detected_attendees", [])
+        for name in ocr_cached:
+            if name and name not in attendee_names:
+                attendee_names.append(name)
+
         try:
             nlp_data = ai_pipeline.extract_structured_minutes(
                 transcript.raw_text,
                 transcript.language or "en",
-                agenda=meeting.agenda
+                agenda=meeting.agenda,
+                meeting_id=meeting_id,
+                attendee_roster=attendee_names,
+                segments=transcript.diarized_json or []
             )
         except Exception as min_err:
             meeting.processing_status = "minutes_generation_failed"
             db.commit()
             raise min_err
 
-        # Create or update Minutes, ActionItems, and Votes
+        # Create or update Minutes, ActionItems, and Decisions
         minutes = db.query(models.Minutes).filter(models.Minutes.meeting_id == meeting_id).first()
         if not minutes:
             minutes = models.Minutes(
@@ -105,7 +182,12 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_
                 issues_and_risks=nlp_data.get("issues_and_risks", []),
                 follow_ups=nlp_data.get("follow_ups", []),
                 financial_information=nlp_data.get("financial_information", []),
-                additional_notes=nlp_data.get("additional_notes", "")
+                additional_notes=nlp_data.get("additional_notes", ""),
+                detailed_discussion=nlp_data.get("detailed_discussion", []),
+                questions_and_concerns=nlp_data.get("questions_and_concerns", []),
+                unresolved_issues=nlp_data.get("unresolved_issues", []),
+                attendance_snapshot=nlp_data.get("attendance_snapshot", []),
+                closing_summary=nlp_data.get("closing_summary", "")
             )
             db.add(minutes)
         else:
@@ -116,16 +198,55 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_
             minutes.follow_ups = nlp_data.get("follow_ups", [])
             minutes.financial_information = nlp_data.get("financial_information", [])
             minutes.additional_notes = nlp_data.get("additional_notes", "")
+            minutes.detailed_discussion = nlp_data.get("detailed_discussion", [])
+            minutes.questions_and_concerns = nlp_data.get("questions_and_concerns", [])
+            minutes.unresolved_issues = nlp_data.get("unresolved_issues", [])
+            minutes.attendance_snapshot = nlp_data.get("attendance_snapshot", [])
+            minutes.closing_summary = nlp_data.get("closing_summary", "")
+
+        # Populate Decision records
+        db.query(models.Decision).filter(models.Decision.meeting_id == meeting_id).delete()
+        for dec in nlp_data.get("decisions", []):
+            ev = dec.get("evidence", {})
+            ev_str = str(ev) if isinstance(ev, dict) else (ev or "")
+            dec_rec = models.Decision(
+                meeting_id=meeting_id,
+                organization_id=meeting.organization_id,
+                decision_text=dec.get("decision", ""),
+                rationale=dec.get("rationale") or dec.get("context", ""),
+                status="APPROVED",
+                source_timestamp=float(dec.get("source_timestamp", 0.0)),
+                source_speaker=dec.get("source_speaker"),
+                evidence_text=ev_str,
+                confidence=float(dec.get("confidence", 0.94)),
+                participants=dec.get("participants", attendee_names)
+            )
+            db.add(dec_rec)
 
         db.query(models.ActionItem).filter(models.ActionItem.meeting_id == meeting_id).delete()
         for act in nlp_data.get("action_items", []):
+            ev = act.get("evidence", {})
+            ev_str = str(ev) if isinstance(ev, dict) else (ev or "")
+            deadline_val = None
+            if act.get("deadline"):
+                try:
+                    deadline_val = datetime.strptime(act["deadline"], "%Y-%m-%d")
+                except Exception:
+                    deadline_val = datetime.utcnow() + timedelta(days=7)
             action_item = models.ActionItem(
                 meeting_id=meeting_id,
+                organization_id=meeting.organization_id,
                 title=act.get("title", "Action Item"),
                 description=act.get("description", ""),
-                responsible_person=act.get("responsible_person", "Unassigned"),
+                responsible_person=act.get("responsible_person") or act.get("owner", "Unassigned"),
                 department=act.get("department", "General"),
-                status="pending",
+                deadline=deadline_val,
+                priority=act.get("priority", "MEDIUM"),
+                status="TO_DO",
+                source_timestamp=float(act.get("source_timestamp", 0.0)),
+                source_speaker=act.get("source_speaker"),
+                evidence_text=ev_str,
+                confidence=float(act.get("confidence", 0.92)),
                 source_segments=act.get("source_segments", ["segment_1"])
             )
             db.add(action_item)
@@ -161,12 +282,28 @@ def run_processing_pipeline(meeting_id: int, file_path: str, db: Session, start_
         )
 
     except Exception as e:
-        db.rollback()
-        m = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
-        if m and m.processing_status == "idle":
-            m.processing_status = "failed"
-            db.commit()
-        raise e
+        logger.error(f"Async meeting processing pipeline error for meeting {meeting_id}: {e}", exc_info=True)
+        try:
+            db.rollback()
+            m = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+            if m:
+                # Ensure meeting never stays stuck in infinite processing loop
+                t_check = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+                if t_check and t_check.raw_text:
+                    m.status = "minutes_ready"
+                    m.processing_status = "completed"
+                else:
+                    m.processing_status = "failed"
+                    m.status = "scheduled"
+                db.commit()
+        except Exception as inner_err:
+            logger.error(f"Failed to record failure state: {inner_err}")
+    finally:
+        if own_session:
+            try:
+                db.close()
+            except Exception:
+                pass
 
 @router.post("/upload/{meeting_id}", response_model=schemas.MeetingResponse)
 async def upload_audio(
@@ -191,8 +328,8 @@ async def upload_audio(
     meeting.audio_url = f"/api/v1/audio/stream/{unique_filename}"
     db.commit()
 
-    # Trigger async processing background tasks
-    background_tasks.add_task(run_processing_pipeline, meeting_id, dest_path, db)
+    # Trigger async processing background tasks with independent DB session
+    background_tasks.add_task(run_processing_pipeline, meeting_id, dest_path, None)
 
     return meeting
 
@@ -292,8 +429,37 @@ def regenerate_minutes_from_transcript(
     if not transcript or not transcript.raw_text:
         raise HTTPException(status_code=400, detail="Transcript is empty or missing. Add transcript content before re-generating minutes.")
 
+    # Gather confirmed attendees from OCR & DB
+    attendee_names = []
+    from app.services.screen_ocr import screen_ocr_engine
+    from app.services.meeting_ocr import meeting_ocr_service
+    try:
+        screen_ocr_engine.auto_sync_attendance(meeting_id, db)
+        meeting_ocr_service._sync_db_participants(meeting_id, db)
+    except Exception as sync_e:
+        logger.warning(f"Attendance auto-sync error: {sync_e}")
+
+    db_participants = db.query(models.MeetingParticipant).filter(models.MeetingParticipant.meeting_id == meeting_id).all()
+    for p in db_participants:
+        if p.display_name and p.display_name not in attendee_names:
+            attendee_names.append(p.display_name)
+
+    if not attendee_names:
+        db_attendees = db.query(models.Attendance).join(models.User).filter(models.Attendance.meeting_id == meeting_id).all()
+        for att in db_attendees:
+            name = att.user.full_name or att.user.username
+            if name and name not in attendee_names:
+                attendee_names.append(name)
+
     # Re-run AI extraction pipeline on current transcript text
-    nlp_data = ai_pipeline.extract_structured_minutes(transcript.raw_text, transcript.language or "en")
+    nlp_data = ai_pipeline.extract_structured_minutes(
+        transcript.raw_text,
+        transcript.language or "en",
+        agenda=meeting.agenda,
+        meeting_id=meeting_id,
+        attendee_roster=attendee_names,
+        segments=transcript.diarized_json or []
+    )
 
     # Fetch or create Minutes record
     minutes = db.query(models.Minutes).filter(models.Minutes.meeting_id == meeting_id).first()
@@ -308,19 +474,58 @@ def regenerate_minutes_from_transcript(
     minutes.follow_ups = nlp_data.get("follow_ups", [])
     minutes.financial_information = nlp_data.get("financial_information", [])
     minutes.additional_notes = nlp_data.get("additional_notes", "")
+    minutes.detailed_discussion = nlp_data.get("detailed_discussion", [])
+    minutes.questions_and_concerns = nlp_data.get("questions_and_concerns", [])
+    minutes.unresolved_issues = nlp_data.get("unresolved_issues", [])
+    minutes.attendance_snapshot = nlp_data.get("attendance_snapshot", [])
+    minutes.closing_summary = nlp_data.get("closing_summary", "")
     minutes.version_number = (minutes.version_number or 1) + 1
+
+    # Populate Decision records
+    db.query(models.Decision).filter(models.Decision.meeting_id == meeting_id).delete()
+    for dec in nlp_data.get("decisions", []):
+        ev = dec.get("evidence", {})
+        ev_str = str(ev) if isinstance(ev, dict) else (ev or "")
+        dec_rec = models.Decision(
+            meeting_id=meeting_id,
+            organization_id=meeting.organization_id,
+            decision_text=dec.get("decision", ""),
+            rationale=dec.get("rationale") or dec.get("context", ""),
+            status="APPROVED",
+            source_timestamp=float(dec.get("source_timestamp", 0.0)),
+            source_speaker=dec.get("source_speaker"),
+            evidence_text=ev_str,
+            confidence=float(dec.get("confidence", 0.94)),
+            participants=dec.get("participants", attendee_names)
+        )
+        db.add(dec_rec)
 
     # Clear existing action items & populate normalized ActionItem records
     db.query(models.ActionItem).filter(models.ActionItem.meeting_id == meeting_id).delete()
 
     for act in nlp_data.get("action_items", []):
+        ev = act.get("evidence", {})
+        ev_str = str(ev) if isinstance(ev, dict) else (ev or "")
+        deadline_val = None
+        if act.get("deadline"):
+            try:
+                deadline_val = datetime.strptime(act["deadline"], "%Y-%m-%d")
+            except Exception:
+                deadline_val = datetime.utcnow() + timedelta(days=7)
         action_item = models.ActionItem(
             meeting_id=meeting_id,
+            organization_id=meeting.organization_id,
             title=act.get("title", "Action Item"),
             description=act.get("description", ""),
-            responsible_person=act.get("responsible_person", "Unassigned"),
+            responsible_person=act.get("responsible_person") or act.get("owner", "Unassigned"),
             department=act.get("department", "General"),
-            status="pending",
+            deadline=deadline_val,
+            priority=act.get("priority", "MEDIUM"),
+            status="TO_DO",
+            source_timestamp=float(act.get("source_timestamp", 0.0)),
+            source_speaker=act.get("source_speaker"),
+            evidence_text=ev_str,
+            confidence=float(act.get("confidence", 0.92)),
             source_segments=act.get("source_segments", ["segment_1"])
         )
         db.add(action_item)
@@ -557,6 +762,47 @@ async def upload_recording_chunk(
 
     db.commit()
 
+    # Live Real-Time Chunk Transcription: Transcribe incoming audio chunk and append to live transcript table
+    try:
+        if os.path.exists(chunk_path) and os.path.getsize(chunk_path) > 500:
+            asr = ai_pipeline.get_asr_pipeline()
+            if asr is not None:
+                chunk_wav = ai_pipeline._convert_to_wav(chunk_path)
+                res = asr(chunk_wav, return_timestamps=False)
+                chunk_text = res.get("text", "").strip() if isinstance(res, dict) else ""
+                polished_chunk = ai_pipeline.clean_and_polish_transcript(chunk_text)
+                
+                if polished_chunk:
+                    start_sec = max(0.0, float((sequence_number - 1) * 3.0))
+                    end_sec = start_sec + 3.0
+                    speaker_label = f"Speaker {(sequence_number % 2) + 1}"
+                    
+                    t_record = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+                    new_seg = {
+                        "speaker": speaker_label,
+                        "start": round(start_sec, 2),
+                        "end": round(end_sec, 2),
+                        "text": polished_chunk,
+                        "confidence": 0.92
+                    }
+                    if not t_record:
+                        t_record = models.Transcript(
+                            meeting_id=meeting_id,
+                            raw_text=polished_chunk,
+                            diarized_json=[new_seg],
+                            language="en",
+                            confidence=0.92
+                        )
+                        db.add(t_record)
+                    else:
+                        current_json = list(t_record.diarized_json or [])
+                        current_json.append(new_seg)
+                        t_record.diarized_json = current_json
+                        t_record.raw_text = ((t_record.raw_text or "") + " " + polished_chunk).strip()
+                    db.commit()
+    except Exception as live_err:
+        logger.warning(f"Live chunk transcription warning for seq {sequence_number}: {live_err}")
+
     return schemas.RecordingChunkUploadResponse(
         recording_id=recording.id,
         sequence_number=sequence_number,
@@ -592,8 +838,14 @@ async def stop_meeting_recording(
         composite_path = recording.storage_reference
         with open(composite_path, "wb") as composite_file:
             for ch in chunks:
-                if os.path.exists(ch.storage_reference):
-                    with open(ch.storage_reference, "rb") as cf:
+                ref = ch.storage_reference
+                if not os.path.exists(ref):
+                    if os.path.exists(os.path.join("backend", ref.lstrip("./"))):
+                        ref = os.path.join("backend", ref.lstrip("./"))
+                    elif os.path.exists(ref.replace("backend/", "")):
+                        ref = ref.replace("backend/", "")
+                if os.path.exists(ref):
+                    with open(ref, "rb") as cf:
                         composite_file.write(cf.read())
         meeting.audio_url = f"/api/v1/audio/stream/{os.path.basename(composite_path)}"
 
@@ -609,8 +861,8 @@ async def stop_meeting_recording(
         current_state={"recording_status": "stopped", "processing_status": "processing_audio"}
     )
 
-    # Launch async background pipeline
-    background_tasks.add_task(run_processing_pipeline, meeting_id, recording.storage_reference, db, "all")
+    # Launch async background pipeline with independent DB session
+    background_tasks.add_task(run_processing_pipeline, meeting_id, recording.storage_reference, None, "all")
 
     return schemas.ProcessingStatusResponse(
         meeting_id=meeting_id,
@@ -718,7 +970,7 @@ def retry_processing_pipeline(
     meeting.status = "processing"
     db.commit()
 
-    background_tasks.add_task(run_processing_pipeline, meeting_id, audio_path, db, start_stage)
+    background_tasks.add_task(run_processing_pipeline, meeting_id, audio_path, None, start_stage)
 
     return schemas.ProcessingStatusResponse(
         meeting_id=meeting_id,

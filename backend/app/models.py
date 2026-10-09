@@ -104,6 +104,9 @@ class Meeting(Base):
     speaker_change_events = relationship("SpeakerChangeEvent", back_populates="meeting")
     diarization_runs = relationship("DiarizationRun", back_populates="meeting")
     diarization_corrections = relationship("DiarizationCorrection", back_populates="meeting")
+    calibrated_voice_profiles = relationship("CalibratedVoiceProfile", foreign_keys="CalibratedVoiceProfile.meeting_id")
+    participants = relationship("MeetingParticipant", back_populates="meeting", cascade="all, delete-orphan")
+    observations = relationship("AttendanceObservation", back_populates="meeting", cascade="all, delete-orphan")
 
 class Attendance(Base):
     __tablename__ = "attendance"
@@ -119,6 +122,56 @@ class Attendance(Base):
 
     meeting = relationship("Meeting", back_populates="attendance")
     user = relationship("User", back_populates="attendance")
+
+class MeetingParticipant(Base):
+    __tablename__ = "meeting_participants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    display_name = Column(String, nullable=False)
+    normalized_name = Column(String, nullable=False, index=True)
+    role = Column(String, default="Participant", nullable=True)
+
+    ocr_name = Column(String, nullable=True)
+    ocr_confidence = Column(Float, default=0.0)
+
+    attendance_status = Column(String, default="DETECTED")  # DETECTED, PRESENT, JOINED, LEFT, UNKNOWN
+    first_seen_at = Column(DateTime(timezone=True), nullable=True)
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
+    joined_at = Column(DateTime(timezone=True), nullable=True)
+    left_at = Column(DateTime(timezone=True), nullable=True)
+
+    voice_profile_id = Column(Integer, ForeignKey("calibrated_voice_profiles.id"), nullable=True)
+
+    identity_status = Column(String, default="UNAVAILABLE")  # MATCHED, AMBIGUOUS, UNKNOWN, UNAVAILABLE
+    identity_confidence = Column(Float, default=0.0)
+    evidence_json = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    meeting = relationship("Meeting", back_populates="participants")
+    observations = relationship("AttendanceObservation", back_populates="participant", cascade="all, delete-orphan")
+    voice_profile = relationship("CalibratedVoiceProfile", foreign_keys=[voice_profile_id])
+    user = relationship("User", foreign_keys=[user_id])
+
+class AttendanceObservation(Base):
+    __tablename__ = "attendance_observations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    participant_id = Column(Integer, ForeignKey("meeting_participants.id"), nullable=True)
+    raw_ocr_text = Column(Text, nullable=True)
+    normalized_name = Column(String, nullable=True)
+    confidence = Column(Float, default=0.85)
+    captured_at = Column(DateTime(timezone=True), server_default=func.now())
+    screen_region = Column(String, nullable=True)
+    source = Column(String, default="screen_ocr")
+
+    meeting = relationship("Meeting", back_populates="observations")
+    participant = relationship("MeetingParticipant", back_populates="observations")
 
 class Transcript(Base):
     __tablename__ = "transcripts"
@@ -144,6 +197,11 @@ class Minutes(Base):
     issues_and_risks = Column(JSON)   # List of issue/risk objects [{issue, impact, source_segments}]
     follow_ups = Column(JSON)         # List of follow-up objects [{item, owner, date, source_segments}]
     financial_information = Column(JSON) # List of financial objects (optional)
+    detailed_discussion = Column(JSON, nullable=True)     # [{topic_section, discussion, paragraphs, source_segments}]
+    questions_and_concerns = Column(JSON, nullable=True)  # [{question, speaker, timestamp, source_segments, evidence}]
+    unresolved_issues = Column(JSON, nullable=True)       # [{issue, status, source_segments, evidence}]
+    attendance_snapshot = Column(JSON, nullable=True)     # [{name, role, joined, left, duration, identity_status}]
+    closing_summary = Column(Text, nullable=True)
     additional_notes = Column(Text)
     version_number = Column(Integer, default=1)
     status = Column(String, default="DRAFT")  # DRAFT, UNDER_REVIEW, APPROVED, FINALIZED, SHA_256_SEALED
@@ -423,6 +481,101 @@ class DiarizationCorrection(Base):
 
     meeting = relationship("Meeting", back_populates="diarization_corrections")
     corrected_by = relationship("User", foreign_keys=[corrected_by_id])
+
+
+class CalibratedVoiceProfile(Base):
+    __tablename__ = "calibrated_voice_profiles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    participant_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=True)
+    organization_id = Column(Integer, ForeignKey("organizations.id"), nullable=True)
+    display_name = Column(String, nullable=False)
+    role = Column(String, default="Participant")
+    department = Column(String, default="General")
+    
+    consent_status = Column(String, default="CONSENT_GRANTED")  # CONSENT_GRANTED, CONSENT_DECLINED, REVOKED
+    consent_timestamp = Column(DateTime(timezone=True), server_default=func.now())
+    retention_days = Column(Integer, default=90)
+    
+    embedding_model = Column(String, default="whisper-librosa-124dim")
+    embedding_dimension = Column(Integer, default=124)
+    embedding_vector = Column(JSON, nullable=True)  # Biometric vector (Sanitized in API responses)
+    
+    pitch_statistics = Column(JSON, nullable=True)       # f0_mean, f0_std, f0_min, f0_max
+    spectral_features = Column(JSON, nullable=True)      # centroid, bandwidth, rolloff, mfcc_stats
+    energy_statistics = Column(JSON, nullable=True)        # rms_mean, rms_std, energy_range
+    zero_crossing_statistics = Column(JSON, nullable=True) # voiced_ratio, zcr_mean
+    
+    sample_count = Column(Integer, default=0)
+    total_sample_duration_seconds = Column(Float, default=0.0)
+    overall_quality_score = Column(Float, default=0.90)   # 0.0 - 1.0
+    calibration_confidence = Column(Float, default=0.92)  # 0.0 - 1.0
+    version = Column(Integer, default=1)
+    drift_risk = Column(String, default="LOW")            # LOW, MEDIUM, HIGH
+    
+    is_active = Column(Boolean, default=True)
+    is_org_reusable = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    samples = relationship("VoiceCalibrationSample", back_populates="profile", cascade="all, delete-orphan")
+    versions = relationship("VoiceProfileVersion", back_populates="profile", cascade="all, delete-orphan")
+    drift_candidates = relationship("ProfileDriftCandidate", back_populates="profile", cascade="all, delete-orphan")
+
+
+class VoiceCalibrationSample(Base):
+    __tablename__ = "voice_calibration_samples"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("calibrated_voice_profiles.id"), nullable=False)
+    sample_index = Column(Integer, default=1)  # 1, 2, 3
+    environment_label = Column(String, default="laptop_mic") # laptop_mic, headset, conference_room, browser_mic
+    dynamic_phrase = Column(String, nullable=True)
+    anti_spoof_passed = Column(Boolean, default=True)
+    storage_reference = Column(String, nullable=True)
+    duration_seconds = Column(Float, default=5.0)
+    quality_score = Column(Float, default=0.90)
+    snr_db = Column(Float, default=20.0)
+    clipping_percentage = Column(Float, default=0.0)
+    vad_ratio = Column(Float, default=0.85)
+    embedding_stability = Column(Float, default=0.92)
+    sample_embedding = Column(JSON, nullable=True)
+    status = Column(String, default="accepted")  # accepted, rejected_noise, rejected_clipping, rejected_short
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    profile = relationship("CalibratedVoiceProfile", back_populates="samples")
+
+
+class VoiceProfileVersion(Base):
+    __tablename__ = "voice_profile_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("calibrated_voice_profiles.id"), nullable=False)
+    version = Column(Integer, nullable=False)
+    previous_profile_id = Column(Integer, nullable=True)
+    source_meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=True)
+    embedding_vector = Column(JSON, nullable=True)
+    calibration_quality = Column(Float, default=0.90)
+    change_reason = Column(String, default="Initial Enrollment")  # Initial Enrollment, Adaptive Meeting Update, Host Recalibration
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    profile = relationship("CalibratedVoiceProfile", back_populates="versions")
+
+
+class ProfileDriftCandidate(Base):
+    __tablename__ = "profile_drift_candidates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profile_id = Column(Integer, ForeignKey("calibrated_voice_profiles.id"), nullable=False)
+    meeting_id = Column(Integer, ForeignKey("meetings.id"), nullable=False)
+    drift_score = Column(Float, default=0.45)
+    candidate_embedding = Column(JSON, nullable=True)
+    status = Column(String, default="PENDING")  # PENDING, ACCEPTED, REJECTED
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    profile = relationship("CalibratedVoiceProfile", back_populates="drift_candidates")
+
 
 
 

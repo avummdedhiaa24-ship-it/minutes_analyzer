@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, model_validator
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
@@ -412,5 +412,203 @@ class SpeakerCorrectionRequest(BaseModel):
     corrected_speaker: str
     action_type: str = "rename"  # rename, merge, split, change_assignment, mark_overlap
     reason: Optional[str] = "human_correction"
+
+
+# ── VOICE CALIBRATION & BIOMETRIC PRIVACY SCHEMAS ──────────────────────────────
+class ParticipantConsentRequest(BaseModel):
+    participant_id: int
+    consent_status: str = "CONSENT_GRANTED"  # CONSENT_GRANTED, CONSENT_DECLINED, REVOKED
+    retention_days: Optional[int] = 90
+
+class ParticipantConsentResponse(BaseModel):
+    participant_id: int
+    meeting_id: int
+    consent_status: str
+    consent_timestamp: datetime
+
+class VoiceCalibrationSampleResponse(BaseModel):
+    id: int
+    sample_index: int
+    duration_seconds: float
+    quality_score: float
+    snr_db: float
+    clipping_percentage: float
+    vad_ratio: float
+    embedding_stability: float
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class CalibratedVoiceProfilePublic(BaseModel):
+    """Public voice profile metadata — NEVER exposes raw embedding vectors for biometric privacy."""
+    id: int
+    participant_id: Optional[int] = None
+    meeting_id: Optional[int] = None
+    organization_id: Optional[int] = None
+    display_name: Optional[str] = None
+    speaker_name: Optional[str] = None
+    role: str = "Participant"
+    department: str = "General"
+    consent_status: str = "CONSENT_GRANTED"
+    sample_count: int = 0
+    total_sample_duration_seconds: float = 0.0
+    overall_quality_score: float = 0.90
+    voice_quality_score: Optional[float] = None
+    calibration_confidence: float = 0.92
+    version: int = 1
+    is_active: bool = True
+    is_calibrated: Optional[bool] = None
+    status: Optional[str] = None
+    is_org_reusable: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_aliases(cls, data: Any):
+        if isinstance(data, dict):
+            if not data.get("display_name") and data.get("speaker_name"):
+                data["display_name"] = data["speaker_name"]
+            if not data.get("speaker_name") and data.get("display_name"):
+                data["speaker_name"] = data["display_name"]
+            if data.get("voice_quality_score") is not None and "overall_quality_score" not in data:
+                data["overall_quality_score"] = data["voice_quality_score"]
+        return data
+
+    class Config:
+        from_attributes = True
+
+class VoiceCalibrationStatusResponse(BaseModel):
+    meeting_id: int
+    total_participants: int
+    enrolled_count: int
+    declined_count: int
+    calibration_progress_percent: float
+    profiles: List[CalibratedVoiceProfilePublic]
+
+class MeetingParticipantCreate(BaseModel):
+    display_name: str
+    role: Optional[str] = "Participant"
+    user_id: Optional[int] = None
+    voice_profile_id: Optional[int] = None
+
+class MeetingParticipantResponse(BaseModel):
+    id: int
+    meeting_id: int
+    organization_id: Optional[int] = None
+    user_id: Optional[int] = None
+    display_name: str
+    normalized_name: str
+    role: Optional[str] = "Participant"
+    ocr_name: Optional[str] = None
+    ocr_confidence: float = 0.0
+    attendance_status: str = "DETECTED"
+    first_seen_at: Optional[datetime] = None
+    last_seen_at: Optional[datetime] = None
+    joined_at: Optional[datetime] = None
+    left_at: Optional[datetime] = None
+    voice_profile_id: Optional[int] = None
+    identity_status: str = "UNAVAILABLE"
+    identity_confidence: float = 0.0
+    evidence_json: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class AttendanceObservationResponse(BaseModel):
+    id: int
+    meeting_id: int
+    participant_id: Optional[int] = None
+    raw_ocr_text: Optional[str] = None
+    normalized_name: Optional[str] = None
+    confidence: float = 0.85
+    captured_at: datetime
+    screen_region: Optional[str] = None
+    source: str = "screen_ocr"
+
+    class Config:
+        from_attributes = True
+
+class AttendanceEventResponse(BaseModel):
+    type: str  # join, leave, detected
+    participant: str
+    participant_id: Optional[int] = None
+    role: Optional[str] = "Participant"
+    timestamp: str
+    confidence: float
+
+class IdentityEvidence(BaseModel):
+    voice_similarity: float = 0.0
+    ocr_presence: float = 0.0
+    temporal_presence: float = 1.0
+    profile_stability: float = 0.95
+    pitch_compatibility: float = 0.90
+    spectral_similarity: float = 0.92
+
+class IdentityFusionResult(BaseModel):
+    speaker_id: str
+    participant_id: Optional[int] = None
+    display_name: str
+    identity_status: str  # MATCHED, AMBIGUOUS, UNKNOWN, UNAVAILABLE
+    identity_confidence: float
+    evidence: Dict[str, Any]
+    reason: str
+    speaker_reentry: bool = False
+    previous_identity: Optional[str] = None
+
+class NamedTranscriptSegment(BaseModel):
+    speaker_id: str
+    participant_id: Optional[int] = None
+    display_name: str
+    identity_status: str
+    identity_confidence: float
+    start_time: float
+    end_time: float
+    text: str
+    source_audio_reference: Optional[str] = None
+    evidence: Optional[Dict[str, Any]] = None
+
+class NamedTranscriptResponse(BaseModel):
+    meeting_id: int
+    language: str
+    total_segments: int
+    segments: List[NamedTranscriptSegment]
+
+class DetailedMinutesResponse(BaseModel):
+    meeting_id: int
+    title: str
+    date: str
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    duration: Optional[str] = None
+    organizer: Optional[str] = None
+    platform: str = "Corporate Meet"
+    attendance: List[Dict[str, Any]]
+    executive_summary: str
+    agenda: Optional[str] = None
+    detailed_discussion: List[Dict[str, Any]]
+    decisions: List[Dict[str, Any]]
+    action_items: List[Dict[str, Any]]
+    risks: List[Dict[str, Any]]
+    questions_and_concerns: List[Dict[str, Any]]
+    unresolved_issues: List[Dict[str, Any]]
+    follow_up_items: List[Dict[str, Any]]
+    closing_summary: str
+    status: str
+    digital_hash: Optional[str] = None
+    version_number: int = 1
+
+class MinutesReviewRequest(BaseModel):
+    summary: Optional[str] = None
+    decisions: Optional[List[Dict[str, Any]]] = None
+    action_items: Optional[List[Dict[str, Any]]] = None
+    notes: Optional[str] = None
+    approve: bool = False
+
+
 
 

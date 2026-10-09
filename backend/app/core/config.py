@@ -11,9 +11,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 1 week
     
     # DB
+    _DEFAULT_DB_PATH: str = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "sql_app.db"))
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "sqlite:///./sql_app.db"
+        f"sqlite:///{_DEFAULT_DB_PATH}"
     )
     
     # Storage

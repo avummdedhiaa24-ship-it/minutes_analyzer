@@ -82,6 +82,15 @@ export default function ProcessingStatus({
       </div>
 
       <div className="flex justify-end gap-3">
+        {!isCompleted && !isFailed && (
+          <button
+            onClick={onViewStudio}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
+          >
+            Open Studio / View Transcript
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
         {canRetry && (
           <button
             onClick={onRetry}

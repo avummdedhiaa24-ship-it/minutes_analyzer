@@ -147,15 +147,23 @@ export const minutesApi = {
     return apiRequest(`/minutes/${meetingId}`, "GET", null, token);
   },
 
+  getDetailed: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/meetings/${meetingId}/minutes/detailed`, "GET", null, token);
+  },
+
+  generate: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/meetings/${meetingId}/minutes/generate`, "POST", null, token);
+  },
+
   update: (meetingId: number, minutesData: any, token?: string | null) => {
     return apiRequest(`/minutes/${meetingId}`, "PUT", minutesData, token);
   },
 
   finalize: (meetingId: number, token?: string | null) => {
-    return apiRequest(`/minutes/${meetingId}/finalize`, "POST", null, token);
+    return apiRequest(`/meetings/${meetingId}/minutes/finalize`, "POST", null, token);
   },
 
-  exportUrl: (meetingId: number, format: "text" | "json" = "text", lang: string = "original") => {
+  exportUrl: (meetingId: number, format: "text" | "json" | "pdf" | "docx" = "text", lang: string = "original") => {
     return `${BASE_URL}/minutes/${meetingId}/export?format=${format}&lang=${lang}`;
   },
 };

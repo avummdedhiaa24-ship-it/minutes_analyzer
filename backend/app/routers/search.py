@@ -80,14 +80,52 @@ def global_enterprise_search(
         } for m in meetings
     ]
 
-    # 4. RAG Vector Semantic Matches
+    # 4. Search Meeting Participants & Attendance
+    participants = db.query(models.MeetingParticipant).filter(
+        (models.MeetingParticipant.display_name.ilike(q)) |
+        (models.MeetingParticipant.role.ilike(q)) |
+        (models.MeetingParticipant.ocr_name.ilike(q))
+    ).all()
+
+    part_results = [
+        {
+            "id": p.id,
+            "meeting_id": p.meeting_id,
+            "type": "participant",
+            "title": p.display_name,
+            "subtitle": f"Role: {p.role or 'Participant'} • Status: {p.attendance_status} • Identity: {p.identity_status}",
+            "status": p.attendance_status,
+            "identity_status": p.identity_status,
+            "url": f"/attendance?meeting_id={p.meeting_id}"
+        } for p in participants
+    ]
+
+    # 5. Search Transcript Text
+    transcripts = db.query(models.Transcript).filter(
+        models.Transcript.raw_text.ilike(q)
+    ).limit(5).all()
+
+    trans_results = [
+        {
+            "id": t.id,
+            "meeting_id": t.meeting_id,
+            "type": "transcript",
+            "title": f"Meeting #{t.meeting_id} Transcript Match",
+            "subtitle": t.raw_text[:140] + ("..." if len(t.raw_text) > 140 else ""),
+            "url": f"/transcript?meeting_id={t.meeting_id}"
+        } for t in transcripts
+    ]
+
+    # 6. RAG Vector Semantic Matches
     semantic_matches = rag_service.search(query, limit=5)
 
     return {
         "query": query,
-        "total_results": len(dec_results) + len(act_results) + len(meet_results) + len(semantic_matches),
+        "total_results": len(dec_results) + len(act_results) + len(meet_results) + len(part_results) + len(trans_results) + len(semantic_matches),
         "decisions": dec_results,
         "action_items": act_results,
         "meetings": meet_results,
+        "participants": part_results,
+        "transcripts": trans_results,
         "semantic_matches": semantic_matches
     }

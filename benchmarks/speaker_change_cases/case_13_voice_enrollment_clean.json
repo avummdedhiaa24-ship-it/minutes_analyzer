@@ -1,0 +1,49 @@
+{
+  "scenario_id": "case_13_voice_enrollment_clean",
+  "description": "High-confidence identity-aware diarization with enrolled voice profiles under clean studio audio conditions",
+  "audio_duration_seconds": 24.0,
+  "enrolled_profiles": [
+    {
+      "display_name": "Avumm (Host)",
+      "role": "Meeting Host",
+      "department": "Engineering",
+      "quality_score": 0.96
+    },
+    {
+      "display_name": "Shyam (Dev)",
+      "role": "Developer",
+      "department": "Engineering",
+      "quality_score": 0.94
+    }
+  ],
+  "ground_truth": {
+    "speaker_segments": [
+      {
+        "speaker": "Avumm (Host)",
+        "start": 0.0,
+        "end": 10.0,
+        "text": "Welcome to today's architecture alignment sync. We will review our Q3 deployment milestone.",
+        "identity_confidence": 0.96,
+        "classification_status": "MATCHED_SPEAKER"
+      },
+      {
+        "speaker": "Shyam (Dev)",
+        "start": 10.0,
+        "end": 24.0,
+        "text": "The microservice backend tests have all passed cleanly with zero regressions.",
+        "identity_confidence": 0.94,
+        "classification_status": "MATCHED_SPEAKER"
+      }
+    ],
+    "speaker_changes": [
+      {
+        "timestamp": 10.0,
+        "from_speaker": "Avumm (Host)",
+        "to_speaker": "Shyam (Dev)",
+        "confidence": 0.95,
+        "classification": "CONFIRMED"
+      }
+    ],
+    "overlaps": []
+  }
+}

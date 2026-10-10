@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Meeting Minutes & OCR Live Capture</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="brand-icon">
+          <div class="brand-glow"></div>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" x2="12" y1="19" y2="22"/>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1 class="brand-title">AI Meeting Minutes</h1>
+          <span class="brand-subtitle">OCR + 9-Signal Voice Fusion</span>
+        </div>
+      </div>
+      <div class="status-indicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-label" id="statusLabel">IDLE</span>
+      </div>
+    </header>
+
+    <!-- Main Live Toggle Section -->
+    <section class="toggle-card">
+      <div class="toggle-header">
+        <div>
+          <h2 class="card-title">Live Meeting Capture</h2>
+          <p class="card-subtitle" id="meetingHint">Google Meet, Zoom, Teams or Tab</p>
+        </div>
+        <div class="timer-badge" id="timerBadge">00:00</div>
+      </div>
+
+      <!-- High-Impact Interactive Toggle Switch -->
+      <div class="switch-container">
+        <span class="switch-state-label" id="labelOff">OFF</span>
+        <label class="switch">
+          <input type="checkbox" id="recordToggle">
+          <span class="slider">
+            <span class="slider-knob">
+              <span class="knob-inner-dot"></span>
+            </span>
+          </span>
+        </label>
+        <span class="switch-state-label" id="labelOn">RECORD</span>
+      </div>
+
+      <!-- Quick Audio & OCR Toggles -->
+      <div class="options-row">
+        <label class="checkbox-label" title="Mixes your microphone audio with meeting tab audio">
+          <input type="checkbox" id="micToggle" checked>
+          <span>🎙️ Mic Audio</span>
+        </label>
+        <label class="checkbox-label" title="Captures video frames every 3s to detect participant names">
+          <input type="checkbox" id="ocrToggle" checked>
+          <span>📸 Screen OCR</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Live Multimodal Metrics Panel (Active during recording) -->
+    <section class="live-panel hidden" id="livePanel">
+      <div class="live-metrics-header">
+        <span class="live-tag">● LIVE STREAMING</span>
+        <span class="fps-tag" id="ocrTickLabel">OCR: 0 frames</span>
+      </div>
+
+      <!-- Audio Waveform Visualizer -->
+      <canvas id="waveformCanvas" width="340" height="42"></canvas>
+
+      <!-- Active Visual Speaker Highlight -->
+      <div class="speaker-spotlight hidden" id="speakerSpotlight">
+        <div class="speaker-pulse"></div>
+        <span class="speaker-text" id="speakerSpotlightText">Active Speaker: Detecting...</span>
+      </div>
+
+      <!-- Detected Participants via OCR -->
+      <div class="attendees-container">
+        <div class="attendees-header">
+          <span>OCR Detected Attendees</span>
+          <span class="attendee-count-badge" id="attendeeCount">0</span>
+        </div>
+        <div class="attendee-chips" id="attendeeChips">
+          <span class="attendee-chip-placeholder">Observing conference video tiles...</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Processing Stepper (Active during minutes generation) -->
+    <section class="processing-panel hidden" id="processingPanel">
+      <div class="processing-header">
+        <div class="spinner"></div>
+        <div>
+          <h3 class="processing-title">Synthesizing AI Minutes</h3>
+          <p class="processing-sub" id="processingStep">Transcribing audio and attributing speakers...</p>
+        </div>
+      </div>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progressBar"></div>
+      </div>
+    </section>
+
+    <!-- Completed AI Minutes Viewer (Appears once minutes ready) -->
+    <section class="minutes-panel hidden" id="minutesPanel">
+      <div class="minutes-header">
+        <div>
+          <div class="score-badge" id="accuracyScore">✨ 98% Verified</div>
+          <h3 class="minutes-title" id="minutesMeetingTitle">Corporate Executive Session</h3>
+        </div>
+        <button class="icon-btn" id="openStudioBtn" title="Open Full Review Studio in Web App">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" x2="21" y1="14" y2="3"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tab-nav">
+        <button class="tab-btn active" data-tab="tab-summary">Summary</button>
+        <button class="tab-btn" data-tab="tab-actions">Actions (<span id="actionsCount">0</span>)</button>
+        <button class="tab-btn" data-tab="tab-decisions">Decisions</button>
+        <button class="tab-btn" data-tab="tab-topics">Discussion</button>
+      </div>
+
+      <!-- Tab Content: Summary -->
+      <div class="tab-pane active" id="tab-summary">
+        <p class="summary-text" id="summaryContent">Loading summary...</p>
+      </div>
+
+      <!-- Tab Content: Actions -->
+      <div class="tab-pane" id="tab-actions">
+        <div class="action-items-list" id="actionItemsList"></div>
+      </div>
+
+      <!-- Tab Content: Decisions -->
+      <div class="tab-pane" id="tab-decisions">
+        <div class="decisions-list" id="decisionsList"></div>
+      </div>
+
+      <!-- Tab Content: Discussion Topics -->
+      <div class="tab-pane" id="tab-topics">
+        <div class="topics-list" id="topicsList"></div>
+      </div>
+
+      <!-- Minutes Footer Action Buttons -->
+      <div class="minutes-actions">
+        <button class="btn btn-secondary" id="copyMarkdownBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+          </svg>
+          Copy Minutes
+        </button>
+        <button class="btn btn-primary" id="openWebStudioBtn">
+          Open Web Studio
+        </button>
+      </div>
+    </section>
+
+    <!-- Footer Status & Settings Link -->
+    <footer class="footer">
+      <div class="footer-status" id="footerServerStatus">
+        <span class="server-dot ok"></span> Backend: http://localhost:8000
+      </div>
+      <button class="settings-link" id="settingsToggleBtn">Settings</button>
+    </footer>
+
+    <!-- Expandable Settings Drawer -->
+    <div class="settings-drawer hidden" id="settingsDrawer">
+      <div class="settings-field">
+        <label>Backend API URL</label>
+        <input type="text" id="backendUrlInput" value="http://localhost:8000">
+      </div>
+      <div class="settings-field">
+        <label>Web App URL</label>
+        <input type="text" id="frontendUrlInput" value="http://localhost:3000">
+      </div>
+      <div class="settings-field">
+        <label>Custom Meeting Title (Optional)</label>
+        <input type="text" id="customTitleInput" placeholder="Auto-detect from browser tab">
+      </div>
+      <button class="btn btn-secondary btn-sm" id="saveSettingsBtn">Save Settings</button>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

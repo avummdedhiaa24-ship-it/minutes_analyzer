@@ -46,6 +46,68 @@ def create_meeting(
     db.refresh(meeting)
     return meeting
 
+class QuickSessionRequest(schemas.BaseModel if hasattr(schemas, "BaseModel") else object):
+    pass
+
+from pydantic import BaseModel
+class QuickSessionPayload(BaseModel):
+    title: Optional[str] = None
+    meeting_link: Optional[str] = None
+    platform_hint: Optional[str] = "generic"
+    agenda: Optional[str] = None
+
+@router.post("/quick-session")
+def create_quick_session(
+    payload: Optional[QuickSessionPayload] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Creates an instant meeting session for browser extensions and on-the-fly live recording.
+    Does not require role guards so extensions can immediately begin streaming OCR and audio.
+    """
+    now = datetime.now()
+    platform = (payload.platform_hint if payload and payload.platform_hint else "web_meeting") or "web_meeting"
+    title = (payload.title if payload and payload.title else None) or f"Live Meeting ({platform.replace('_', ' ').title()}) - {now.strftime('%d %b, %H:%M')}"
+    link = payload.meeting_link if payload else None
+    agenda = (payload.agenda if payload and payload.agenda else None) or "Automated live recording session with screen OCR and AI minutes synthesis."
+
+    user = db.query(models.User).first()
+    sec_id = user.id if user else None
+
+    meeting = models.Meeting(
+        title=title,
+        description=f"Live recording session initiated from browser extension on {platform}.",
+        meeting_type="General",
+        department="General",
+        date=now,
+        location=platform,
+        meeting_link=link,
+        scheduled_start=now,
+        actual_start=now,
+        agenda=agenda,
+        secretary_id=sec_id,
+        status="in_progress",
+        recording_status="recording",
+        processing_status="idle"
+    )
+    db.add(meeting)
+    db.commit()
+    db.refresh(meeting)
+
+    meeting.qr_code_data = f"meeting_pass:meeting_id={meeting.id}:date={now.strftime('%Y%m%d')}"
+    db.commit()
+    db.refresh(meeting)
+
+    return {
+        "id": meeting.id,
+        "title": meeting.title,
+        "status": meeting.status,
+        "recording_status": meeting.recording_status,
+        "processing_status": meeting.processing_status,
+        "meeting_link": meeting.meeting_link,
+        "created_at": meeting.created_at.isoformat() if meeting.created_at else now.isoformat()
+    }
+
 @router.get("", response_model=List[schemas.MeetingResponse])
 @router.get("/", response_model=List[schemas.MeetingResponse])
 def list_meetings(

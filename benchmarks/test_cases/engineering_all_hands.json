@@ -1,0 +1,30 @@
+{
+  "name": "engineering_all_hands",
+  "reference_segments": [
+    { "start": 0.0, "end": 20.0, "speaker": "VP_Engineering" },
+    { "start": 20.0, "end": 45.0, "speaker": "Principal_Architect" },
+    { "start": 45.0, "end": 80.0, "speaker": "DevOps_Lead" }
+  ],
+  "hypothesis_segments": [
+    { "start": 0.0, "end": 19.5, "speaker": "SPEAKER_1" },
+    { "start": 19.5, "end": 44.5, "speaker": "SPEAKER_2" },
+    { "start": 44.5, "end": 80.0, "speaker": "SPEAKER_3" }
+  ],
+  "gold_summary": "Engineering leadership finalized migration to Kubernetes microservices and approved $75,000 for cloud GPU clusters.",
+  "hypothesis_summary": "Engineering leadership reviewed cloud architecture and infrastructure budgets. Key decisions approved include: Approved migration to Kubernetes; Approved GPU infrastructure budget.",
+  "transcript": "VP Engineering: We need to transition the core diarization pipeline to containerized Kubernetes nodes. Principal Architect: The GPU clusters will accelerate model inference by 4x, requiring an estimated budget of seventy-five thousand dollars. DevOps Lead: Deployment scripts are ready for rollout next sprint.",
+  "extracted_claims": [
+    {
+      "text": "Finalized migration to Kubernetes microservices",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Approved $75,000 for cloud GPU clusters",
+      "is_hallucinated": false
+    },
+    {
+      "text": "Migrated entire backend to legacy on-premise mainframe",
+      "is_hallucinated": true
+    }
+  ]
+}

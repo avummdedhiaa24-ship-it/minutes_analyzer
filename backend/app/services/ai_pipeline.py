@@ -330,7 +330,8 @@ class AIPipelineService:
                                 embedding=None,
                                 timestamp_start=s_start,
                                 timestamp_end=s_end,
-                                candidate_cluster_label=s_raw
+                                candidate_cluster_label=s_raw,
+                                speech_text=seg.get("text", "")
                             )
                             seg["speaker_id"] = fusion["speaker_id"]
                             seg["participant_id"] = fusion.get("participant_id")
@@ -348,7 +349,7 @@ class AIPipelineService:
                             elif fusion.get("identity_status") == "AMBIGUOUS":
                                 seg["speaker"] = fusion.get("display_name") or f"{s_raw} (Identity uncertain)"
                             else:
-                                seg["speaker"] = s_raw or f"Speaker {cluster_num}"
+                                seg["speaker"] = fusion.get("display_name") or s_raw or f"Speaker {cluster_num}"
 
                         logger.info(f"Multi-Signal Diarization & Word Alignment successful: {len(aligned_diarized)} segment(s)")
                         return raw_text, aligned_diarized
@@ -402,7 +403,8 @@ class AIPipelineService:
                     embedding=None,
                     timestamp_start=s_start,
                     timestamp_end=s_end,
-                    candidate_cluster_label=s_raw
+                    candidate_cluster_label=s_raw,
+                    speech_text=seg.get("text", "")
                 )
                 seg["speaker_id"] = fusion["speaker_id"]
                 seg["participant_id"] = fusion.get("participant_id")
@@ -414,9 +416,9 @@ class AIPipelineService:
                 if fusion["identity_status"] == "MATCHED":
                     seg["speaker"] = fusion["display_name"]
                 elif fusion["identity_status"] == "AMBIGUOUS":
-                    seg["speaker"] = f"{s_raw} (Identity uncertain)"
-                elif fusion["identity_status"] == "UNKNOWN":
-                    seg["speaker"] = "UNKNOWN SPEAKER"
+                    seg["speaker"] = fusion.get("display_name") or f"{s_raw} (Identity uncertain)"
+                else:
+                    seg["speaker"] = fusion.get("display_name") or s_raw
         except Exception as e:
             logger.debug(f"Fallback identity fusion skipped: {e}")
 

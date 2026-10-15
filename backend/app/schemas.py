@@ -149,6 +149,20 @@ class TranscriptSegment(BaseModel):
     start: float
     end: float
     text: str
+    display_name: Optional[str] = None
+    identity_status: Optional[str] = None
+    identity_confidence: Optional[float] = None
+    confidence: Optional[float] = None
+    speaker_id: Optional[str] = None
+    participant_id: Optional[int] = None
+    evidence: Optional[Dict[str, Any]] = None
+    reason: Optional[str] = None
+    overlapping: Optional[bool] = None
+    primary_speaker: Optional[str] = None
+    secondary_speaker: Optional[str] = None
+
+    class Config:
+        extra = "allow"
 
 class TranscriptResponse(BaseModel):
     id: int

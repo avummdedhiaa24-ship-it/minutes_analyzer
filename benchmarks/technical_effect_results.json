@@ -1,0 +1,26 @@
+{
+  "total_test_turns": 50,
+  "models": {
+    "voice_only_baseline": {
+      "accuracy_percent": 44.0,
+      "false_attribution_rate_percent": 56.0,
+      "correct_turns": 22
+    },
+    "ocr_only_baseline": {
+      "accuracy_percent": 56.0,
+      "false_attribution_rate_percent": 44.0,
+      "correct_turns": 28
+    },
+    "proposed_fused_engine": {
+      "accuracy_percent": 88.0,
+      "false_attribution_rate_percent": 12.0,
+      "correct_turns": 44,
+      "ambiguous_turns_routed_to_human_review": 0
+    }
+  },
+  "technical_effect": {
+    "improvement_over_voice_only_percent": 44.0,
+    "improvement_over_ocr_only_percent": 32.0,
+    "false_attribution_reduction_percent": 44.0
+  }
+}

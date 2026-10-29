@@ -112,6 +112,37 @@ class NarrationService:
 
         file_size = os.path.getsize(filepath)
 
+        # 4. Generate Sentence-by-Sentence Timestamps (Claim 15.c, Claim 17)
+        import re
+        import json
+        raw_sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', narration_script) if s.strip()]
+        total_chars = max(sum(len(s) for s in raw_sentences), 1)
+        est_duration = max(file_size / 16000.0 if filepath.endswith(".wav") else len(narration_script) * 0.065, 4.0)
+
+        sentence_alignment = []
+        cur_t = 0.0
+        for s_idx, sent in enumerate(raw_sentences):
+            dur = max(len(sent) / total_chars * est_duration, 1.2)
+            sentence_alignment.append({
+                "sentence_index": s_idx,
+                "text": sent,
+                "start_time": round(cur_t, 2),
+                "end_time": round(cur_t + dur, 2)
+            })
+            cur_t += dur
+
+        meta_filename = f"narration_meeting_{meeting_id}_v{version_num}_meta.json"
+        meta_filepath = os.path.join(self.narrations_dir, meta_filename)
+        metadata = {
+            "meeting_id": meeting_id,
+            "version_number": version_num,
+            "audio_sha256": audio_sha256,
+            "minutes_version_hash": minutes.digital_hash,
+            "sentences": sentence_alignment
+        }
+        with open(meta_filepath, "w") as f:
+            json.dump(metadata, f, indent=2)
+
         return {
             "meeting_id": meeting_id,
             "version_number": version_num,
@@ -121,7 +152,62 @@ class NarrationService:
             "minutes_digital_hash": minutes.digital_hash,
             "narration_script": narration_script,
             "file_size_bytes": file_size,
+            "sentence_count": len(sentence_alignment),
+            "sentences": sentence_alignment,
             "is_bound_to_sealed_version": bool(minutes.digital_hash)
+        }
+
+    def get_sentence_alignment(self, meeting_id: int, db: Session) -> List[Dict[str, Any]]:
+        """Returns sentence start and end times for real-time text highlighting (Claim 17)."""
+        import json
+        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+        if not meeting or not meeting.minutes:
+            return []
+        ver = meeting.minutes.version_number or 1
+        meta_path = os.path.join(self.narrations_dir, f"narration_meeting_{meeting_id}_v{ver}_meta.json")
+        if os.path.exists(meta_path):
+            with open(meta_path, "r") as f:
+                data = json.load(f)
+                return data.get("sentences", [])
+        return []
+
+    def verify_narration_binding(self, meeting_id: int, db: Session) -> Dict[str, Any]:
+        """
+        Compares stored audio narration hash with the current finalized minutes hash (Claim 15.d, 15.e).
+        Refuses to present audio as official if hashes differ.
+        """
+        import json
+        meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+        if not meeting or not meeting.minutes:
+            return {"valid": False, "official": False, "message": "Meeting or minutes not found"}
+
+        minutes = meeting.minutes
+        ver = minutes.version_number or 1
+        meta_path = os.path.join(self.narrations_dir, f"narration_meeting_{meeting_id}_v{ver}_meta.json")
+
+        if not os.path.exists(meta_path):
+            return {
+                "valid": False,
+                "official": False,
+                "message": "No bound narration metadata artifact found for this version"
+            }
+
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+
+        stored_min_hash = meta.get("minutes_version_hash")
+        cur_min_hash = minutes.digital_hash
+
+        is_match = bool(stored_min_hash and cur_min_hash and stored_min_hash == cur_min_hash)
+        return {
+            "meeting_id": meeting_id,
+            "version_number": ver,
+            "official": is_match,
+            "audio_sha256": meta.get("audio_sha256"),
+            "stored_minutes_hash": stored_min_hash,
+            "current_minutes_hash": cur_min_hash,
+            "status": "OFFICIAL_AUTHENTICATED_NARRATION" if is_match else "HASH_MISMATCH_UNVERIFIED_DRAFT",
+            "message": "Narration matches sealed minutes hash perfectly." if is_match else "Narration hash does not match current minutes hash! Audio refused as official."
         }
 
     def get_narration_filepath(self, meeting_id: int, db: Session) -> Optional[str]:

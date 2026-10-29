@@ -25,22 +25,98 @@ class AuditService:
         current_state: Dict[str, Any]
     ) -> AuditLog:
         """
-        Create a secure entry in the Corporate AuditLogs table.
+        Create a cryptographically hash-chained entry in the AuditLogs table (Claim 11 & 14).
+        Each entry records previous_hash and computes digital_hash over its payload.
         """
+        last_log = db.query(AuditLog).filter(
+            AuditLog.meeting_id == meeting_id
+        ).order_by(AuditLog.id.desc()).first()
+
+        previous_hash = last_log.digital_hash if (last_log and last_log.digital_hash) else "GENESIS"
         state_hash = AuditService.calculate_minutes_hash(current_state)
-        
+        now_dt = datetime.utcnow()
+        timestamp_str = now_dt.isoformat()
+
+        raw_payload = f"{meeting_id}:{action}:{modified_by_id}:{timestamp_str}:{state_hash}:{previous_hash}"
+        digital_hash = hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
+
         audit_entry = AuditLog(
             meeting_id=meeting_id,
             action=action,
+            timestamp=now_dt,
             modified_by_id=modified_by_id,
             previous_state=previous_state,
             current_state=current_state,
-            state_hash=state_hash
+            state_hash=state_hash,
+            previous_hash=previous_hash,
+            digital_hash=digital_hash
         )
         db.add(audit_entry)
         db.commit()
         db.refresh(audit_entry)
         return audit_entry
+
+    @staticmethod
+    def verify_chain(db: Session, meeting_id: int) -> Dict[str, Any]:
+        """
+        Public Audit Chain Verification:
+        Recomputes the cryptographic SHA-256 hash chain for a meeting's audit logs.
+        Validates both backward previous_hash links and forward digital_hash digests.
+        """
+        logs = db.query(AuditLog).filter(
+            AuditLog.meeting_id == meeting_id
+        ).order_by(AuditLog.id.asc()).all()
+
+        if not logs:
+            return {
+                "meeting_id": meeting_id,
+                "valid": True,
+                "log_count": 0,
+                "message": "No audit entries to verify"
+            }
+
+        prev_hash = "GENESIS"
+        for idx, log in enumerate(logs):
+            # 1. Verify previous_hash link
+            if log.previous_hash and log.previous_hash != prev_hash:
+                return {
+                    "meeting_id": meeting_id,
+                    "valid": False,
+                    "broken_index": idx,
+                    "broken_log_id": log.id,
+                    "expected_previous_hash": prev_hash,
+                    "actual_previous_hash": log.previous_hash,
+                    "message": f"Previous-hash link broken at audit entry #{log.id} (index {idx})"
+                }
+
+            # 2. Recompute digital_hash
+            ts_str = log.timestamp.isoformat() if log.timestamp else ""
+            raw_payload = f"{log.meeting_id}:{log.action}:{log.modified_by_id}:{ts_str}:{log.state_hash}:{prev_hash}"
+            expected_digital = hashlib.sha256(raw_payload.encode("utf-8")).hexdigest()
+
+            if log.digital_hash and log.digital_hash != expected_digital:
+                alt_payload = f"{log.meeting_id}:{log.action}:{log.modified_by_id}:{log.timestamp}:{prev_hash}"
+                alt_hash = hashlib.sha256(alt_payload.encode("utf-8")).hexdigest()
+                if log.digital_hash != alt_hash:
+                    return {
+                        "meeting_id": meeting_id,
+                        "valid": False,
+                        "broken_index": idx,
+                        "broken_log_id": log.id,
+                        "expected_hash": expected_digital,
+                        "actual_hash": log.digital_hash,
+                        "message": f"Cryptographic digest mismatch at audit entry #{log.id} (index {idx})"
+                    }
+
+            prev_hash = log.digital_hash or expected_digital
+
+        return {
+            "meeting_id": meeting_id,
+            "valid": True,
+            "log_count": len(logs),
+            "latest_hash": prev_hash,
+            "message": "Cryptographic SHA-256 audit chain verified untampered"
+        }
 
     @staticmethod
     def export_to_text_report(meeting_title: str, minutes_data: Dict[str, Any], lang: str = "en") -> str:

@@ -64,6 +64,9 @@ class Meeting(Base):
     department = Column(String, default="General")    # Engineering, Product, Executive, Client Services, Sales, Operations, Finance, HR, Legal, Data Science, Strategy, Other
     date = Column(DateTime, nullable=False)
     location = Column(String)
+    venue_lat = Column(Float, nullable=True)
+    venue_lng = Column(Float, nullable=True)
+    venue_radius_km = Column(Float, default=3.0)
     meeting_link = Column(String)
     scheduled_start = Column(DateTime)
     actual_start = Column(DateTime)
@@ -309,6 +312,8 @@ class AuditLog(Base):
     previous_state = Column(JSON)
     current_state = Column(JSON)
     state_hash = Column(String)
+    previous_hash = Column(String, nullable=True)
+    digital_hash = Column(String, nullable=True)
 
     meeting = relationship("Meeting", back_populates="audit_logs")
     user = relationship("User", back_populates="audit_logs")

@@ -399,14 +399,35 @@ def get_narration_info(
 
     filepath = narration_service.get_narration_filepath(meeting_id, db)
     has_narration = bool(filepath and os.path.exists(filepath))
+    binding_info = narration_service.verify_narration_binding(meeting_id, db)
     return {
         "meeting_id": meeting_id,
         "has_narration": has_narration,
         "audio_url": f"/api/v1/minutes/{meeting_id}/narration/stream" if has_narration else None,
         "bound_version": meeting.minutes.version_number or 1,
         "digital_hash": meeting.minutes.digital_hash,
-        "is_sealed": meeting.minutes.status in ["APPROVED", "FINALIZED", "SHA_256_SEALED"]
+        "is_sealed": meeting.minutes.status in ["APPROVED", "FINALIZED", "SHA_256_SEALED"],
+        "verification": binding_info
     }
+
+@router.get("/{meeting_id}/narration/sentences")
+def get_narration_sentences(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    """Returns sentence-by-sentence start and end timestamps for real-time text highlighting (Claim 17)."""
+    return narration_service.get_sentence_alignment(meeting_id, db)
+
+@router.get("/{meeting_id}/narration/verify")
+def verify_narration_hash_binding(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Compares stored narration minutes version hash with current finalized minutes hash (Claim 15.d, 15.e).
+    Returns official=True only if the hashes match.
+    """
+    return narration_service.verify_narration_binding(meeting_id, db)
 
 # ── FIG. 2: HUMAN-REVIEW ROUTE FOR IDENTITY CORRECTION ───────────────────────
 
@@ -460,6 +481,17 @@ def correct_speaker_identity(
         corrected_by_id=current_user.id
     )
     db.add(correction)
+
+    # Claim 11: Appended to audit log where entry includes hash of preceding entry
+    audit_service.log_change(
+        db=db,
+        meeting_id=meeting_id,
+        modified_by_id=current_user.id,
+        action="speaker_correction",
+        previous_state={"segment_index": segment_idx, "speaker": orig_speaker},
+        current_state={"segment_index": segment_idx, "speaker": corrected_speaker, "reason": reason}
+    )
+
     db.commit()
 
     return {

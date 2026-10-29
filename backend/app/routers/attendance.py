@@ -41,20 +41,27 @@ def checkin_attendance(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Check if already checked in
+    # Check if already checked in (Claim 4: second check-in of the same participant is rejected)
     existing = db.query(models.Attendance).filter(
         models.Attendance.meeting_id == meeting_id,
         models.Attendance.user_id == checkin.user_id
     ).first()
     if existing:
-        return existing
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Duplicate check-in rejected: participant is already checked in for this meeting."
+        )
 
-    # Perform GPS proximity check if coordinates are provided
+    # Perform GPS proximity check using configurable meeting venue (Claim 4, Gap 8)
+    venue_lat = meeting.venue_lat if meeting.venue_lat is not None else HQ_LAT
+    venue_lng = meeting.venue_lng if meeting.venue_lng is not None else HQ_LNG
+    permitted_radius = meeting.venue_radius_km if meeting.venue_radius_km is not None else MAX_ALLOWED_DISTANCE_KM
+
     verified = True
     if checkin.gps_lat and checkin.gps_lng:
-        distance = haversine_distance(HQ_LAT, HQ_LNG, checkin.gps_lat, checkin.gps_lng)
-        if distance > MAX_ALLOWED_DISTANCE_KM:
-            verified = False  # Flag check-in if too far, but do not necessarily crash (allow fallback secretary review)
+        distance = haversine_distance(venue_lat, venue_lng, checkin.gps_lat, checkin.gps_lng)
+        if distance > permitted_radius:
+            verified = False  # Flag check-in if outside permitted radius
 
     attendance = models.Attendance(
         meeting_id=meeting_id,

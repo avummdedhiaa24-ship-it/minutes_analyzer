@@ -230,6 +230,9 @@ class MeetingBase(BaseModel):
     department: Optional[str] = "General"
     date: datetime
     location: Optional[str] = None
+    venue_lat: Optional[float] = None
+    venue_lng: Optional[float] = None
+    venue_radius_km: Optional[float] = 3.0
     meeting_link: Optional[str] = None
     scheduled_start: Optional[datetime] = None
     agenda: Optional[str] = None
@@ -280,6 +283,8 @@ class AuditLogResponse(BaseModel):
     previous_state: Optional[Dict[str, Any]] = None
     current_state: Optional[Dict[str, Any]] = None
     state_hash: Optional[str] = None
+    previous_hash: Optional[str] = None
+    digital_hash: Optional[str] = None
     user: UserResponse
 
     class Config:

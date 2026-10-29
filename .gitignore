@@ -1,29 +1,18 @@
-# Dependency directories
+# Dependency directories & build artifacts
 node_modules/
 venv/
 env/
-.env
-.env.local
-.env.development
-.env.production
-.env.staging
-
-# Next.js build
 .next/
 out/
 tsconfig.tsbuildinfo
 
-# Python artifacts
+# Python cache & test cache
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
-
-# Databases & local files
-*.db
-uploads/
 .DS_Store
 
-# IDE configs
-.vscode/
-.idea/
+# Ephemeral test database files
+*test_temp.db*
+*test_screen_ocr.db*

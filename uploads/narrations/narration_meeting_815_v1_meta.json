@@ -1,0 +1,38 @@
+{
+  "meeting_id": 815,
+  "version_number": 1,
+  "audio_sha256": "3573d0ea2bb5ae6eb96905961966813f07c4e52ff8a020a1a5e34f2719b9ef58",
+  "minutes_version_hash": "sha256_canonical_minutes_seal_987654321",
+  "sentences": [
+    {
+      "sentence_index": 0,
+      "text": "Official Audio Briefing for Gram Sabha Resolution Session.",
+      "start_time": 0.0,
+      "end_time": 3.82
+    },
+    {
+      "sentence_index": 1,
+      "text": "Sealed Minutes Version 1.",
+      "start_time": 3.82,
+      "end_time": 5.47
+    },
+    {
+      "sentence_index": 2,
+      "text": "Executive Summary: Approved water tank construction and road repair in Ward 2.",
+      "start_time": 5.47,
+      "end_time": 10.61
+    },
+    {
+      "sentence_index": 3,
+      "text": "Key Resolutions Approved: Construct 50000L overhead water tank.",
+      "start_time": 10.61,
+      "end_time": 14.76
+    },
+    {
+      "sentence_index": 4,
+      "text": "This record is cryptographically sealed with hash seal sha256_canon.",
+      "start_time": 14.76,
+      "end_time": 19.24
+    }
+  ]
+}

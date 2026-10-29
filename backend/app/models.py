@@ -206,6 +206,7 @@ class Minutes(Base):
     version_number = Column(Integer, default=1)
     status = Column(String, default="DRAFT")  # DRAFT, UNDER_REVIEW, APPROVED, FINALIZED, SHA_256_SEALED
     digital_hash = Column(String)
+    audio_narration_url = Column(String, nullable=True)
     approved_by_id = Column(Integer, ForeignKey("users.id"))
     approved_at = Column(DateTime)
     doc_url = Column(String)
@@ -229,6 +230,7 @@ class MinutesVersion(Base):
     changes_summary = Column(Text)
     edited_by_id = Column(Integer, ForeignKey("users.id"))
     digital_hash = Column(String)
+    audio_narration_url = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     minutes = relationship("Minutes", back_populates="versions")

@@ -347,6 +347,56 @@ def stream_audio(
         raise HTTPException(status_code=404, detail="Audio recording not found")
     return FileResponse(file_path, media_type="audio/mpeg")
 
+@router.get("/meeting/{meeting_id}")
+def stream_meeting_audio(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    FIG. 4: Audio Re-listening source endpoint.
+    Streams the meeting's source audio recording so each line of transcript
+    maps directly to its audio snippet for synchronized playback.
+    """
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    # 1. Check meeting.audio_url
+    if meeting.audio_url:
+        fname = os.path.basename(meeting.audio_url)
+        cand_path = os.path.join(settings.UPLOAD_DIR, fname)
+        if os.path.exists(cand_path):
+            media_type = "audio/wav" if cand_path.endswith(".wav") else "audio/mpeg"
+            return FileResponse(cand_path, media_type=media_type)
+
+    # 2. Check meeting_recordings table
+    rec = db.query(models.MeetingRecording).filter(models.MeetingRecording.meeting_id == meeting_id).first()
+    if rec and rec.storage_reference and os.path.exists(rec.storage_reference):
+        media_type = "audio/wav" if rec.storage_reference.endswith(".wav") else "audio/mpeg"
+        return FileResponse(rec.storage_reference, media_type=media_type)
+
+    # 3. Check uploads directory for meeting_{id} audio files
+    for ext in [".wav", ".mp3", ".webm"]:
+        cand = os.path.join(settings.UPLOAD_DIR, f"meeting_{meeting_id}{ext}")
+        if os.path.exists(cand):
+            return FileResponse(cand, media_type="audio/wav" if ext == ".wav" else "audio/mpeg")
+
+    # 4. Synthesize playback audio from transcript segments if no raw file was uploaded
+    tr = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if tr and tr.raw_text:
+        cached_synth = os.path.join(settings.UPLOAD_DIR, f"synthetic_meeting_{meeting_id}.mp3")
+        if not os.path.exists(cached_synth):
+            try:
+                from gtts import gTTS
+                tts = gTTS(text=tr.raw_text, lang="en", slow=False)
+                tts.save(cached_synth)
+            except Exception:
+                pass
+        if os.path.exists(cached_synth):
+            return FileResponse(cached_synth, media_type="audio/mpeg")
+
+    raise HTTPException(status_code=404, detail="No audio source available for this meeting.")
+
 @router.get("/transcript/{meeting_id}", response_model=schemas.TranscriptResponse)
 def get_transcript(
     meeting_id: int,

@@ -138,6 +138,10 @@ export const audioApi = {
   regenerateMinutes: (meetingId: number, token?: string | null) => {
     return apiRequest(`/audio/transcript/${meetingId}/regenerate-minutes`, "POST", null, token);
   },
+
+  meetingAudioUrl: (meetingId: number) => {
+    return `${BASE_URL}/audio/meeting/${meetingId}`;
+  },
 };
 
 
@@ -166,6 +170,24 @@ export const minutesApi = {
   exportUrl: (meetingId: number, format: "text" | "json" | "pdf" | "docx" = "text", lang: string = "original") => {
     return `${BASE_URL}/minutes/${meetingId}/export?format=${format}&lang=${lang}`;
   },
+
+  // FIG. 5: Audio Narration bound to sealed version
+  generateNarration: (meetingId: number, lang: string = "en", token?: string | null) => {
+    return apiRequest(`/minutes/${meetingId}/narration?lang=${lang}`, "POST", null, token);
+  },
+
+  getNarrationInfo: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/minutes/${meetingId}/narration/info`, "GET", null, token);
+  },
+
+  narrationStreamUrl: (meetingId: number) => {
+    return `${BASE_URL}/minutes/${meetingId}/narration/stream`;
+  },
+
+  // FIG. 2: Human-Review Route Speaker Correction
+  correctSpeaker: (meetingId: number, payload: { segment_index: number; corrected_speaker: string; reason?: string }, token?: string | null) => {
+    return apiRequest(`/minutes/${meetingId}/correct-speaker`, "POST", payload, token);
+  },
 };
 
 // Chatbot (RAG)
@@ -182,10 +204,13 @@ export const searchApi = {
   },
 };
 
-// Audit Logs
+// Audit Logs & Cryptographic Verification
 export const auditApi = {
   getLogs: (meetingId: number, token?: string | null) => {
     return apiRequest(`/audit/${meetingId}`, "GET", null, token);
+  },
+  verifyChain: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audit/verify/${meetingId}`, "GET", null, token);
   },
 };
 

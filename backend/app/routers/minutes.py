@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
+import os
 import hashlib
 
 from app.core.database import get_db
@@ -10,6 +12,7 @@ from app import models, schemas
 from app.routers.auth import get_current_user, RoleChecker
 from app.services.audit import audit_service
 from app.services.ai_pipeline import ai_pipeline
+from app.services.narration import narration_service
 
 router = APIRouter(prefix="/minutes", tags=["Minutes & Human Review"])
 
@@ -344,3 +347,128 @@ def export_minutes(
         media_type="text/plain; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={filename_prefix}.txt"}
     )
+
+# ── FIG. 5: TRANSCRIPT-TO-AUDIO NARRATION BOUND TO SEALED MINUTES VERSION ────
+
+@router.post("/{meeting_id}/narration")
+def generate_minutes_narration(
+    meeting_id: int,
+    lang: str = "en",
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    FIG. 5: Synthesizes an executive audio narration of the sealed minutes summary,
+    calculates its SHA-256 hash, and cryptographically binds it to the minutes version.
+    """
+    try:
+        result = narration_service.synthesize_narration(meeting_id, db, lang=lang)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to synthesize narration: {str(e)}")
+
+@router.get("/{meeting_id}/narration/stream")
+def stream_minutes_narration(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    """Streams the official audio narration file bound to this meeting's sealed minutes."""
+    filepath = narration_service.get_narration_filepath(meeting_id, db)
+    if not filepath or not os.path.exists(filepath):
+        # Auto-generate if not yet synthesized
+        try:
+            res = narration_service.synthesize_narration(meeting_id, db)
+            filepath = narration_service.get_narration_filepath(meeting_id, db)
+        except Exception:
+            pass
+    if not filepath or not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Narration audio not generated yet for this meeting.")
+
+    media_type = "audio/mpeg" if filepath.endswith(".mp3") else "audio/wav"
+    return FileResponse(filepath, media_type=media_type)
+
+@router.get("/{meeting_id}/narration/info")
+def get_narration_info(
+    meeting_id: int,
+    db: Session = Depends(get_db)
+):
+    """Returns verification and cryptographic binding metadata for the narration audio."""
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting or not meeting.minutes:
+        raise HTTPException(status_code=404, detail="Meeting or minutes not found")
+
+    filepath = narration_service.get_narration_filepath(meeting_id, db)
+    has_narration = bool(filepath and os.path.exists(filepath))
+    return {
+        "meeting_id": meeting_id,
+        "has_narration": has_narration,
+        "audio_url": f"/api/v1/minutes/{meeting_id}/narration/stream" if has_narration else None,
+        "bound_version": meeting.minutes.version_number or 1,
+        "digital_hash": meeting.minutes.digital_hash,
+        "is_sealed": meeting.minutes.status in ["APPROVED", "FINALIZED", "SHA_256_SEALED"]
+    }
+
+# ── FIG. 2: HUMAN-REVIEW ROUTE FOR IDENTITY CORRECTION ───────────────────────
+
+@router.post("/{meeting_id}/correct-speaker")
+def correct_speaker_identity(
+    meeting_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    """
+    FIG. 2: Human-Review Route.
+    Allows a human reviewer to resolve AMBIGUOUS or UNKNOWN identity turns,
+    re-assigning the turn to a verified participant and committing to DiarizationCorrection ledger.
+    """
+    segment_idx = payload.get("segment_index")
+    corrected_speaker = payload.get("corrected_speaker")
+    reason = payload.get("reason", "Human reviewer corrected identity turn in review studio")
+
+    if segment_idx is None or not corrected_speaker:
+        raise HTTPException(status_code=400, detail="segment_index and corrected_speaker required")
+
+    transcript = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
+    if not transcript or not transcript.diarized_json:
+        raise HTTPException(status_code=404, detail="Transcript segments not found")
+
+    segments = list(transcript.diarized_json)
+    if segment_idx < 0 or segment_idx >= len(segments):
+        raise HTTPException(status_code=400, detail="Invalid segment index")
+
+    target_seg = segments[segment_idx]
+    orig_speaker = target_seg.get("display_name") or target_seg.get("speaker") or "UNKNOWN SPEAKER"
+
+    # Update segment
+    target_seg["speaker"] = corrected_speaker
+    target_seg["display_name"] = corrected_speaker
+    target_seg["identity_status"] = "MATCHED"
+    target_seg["identity_confidence"] = 0.99
+    target_seg["reason"] = f"Human Verified: {reason}"
+
+    transcript.diarized_json = segments
+
+    # Log to DiarizationCorrection table
+    correction = models.DiarizationCorrection(
+        meeting_id=meeting_id,
+        segment_id=segment_idx + 1,
+        original_speaker=orig_speaker,
+        corrected_speaker=corrected_speaker,
+        action_type="human_review_resolve",
+        reason=reason,
+        corrected_by_id=current_user.id
+    )
+    db.add(correction)
+    db.commit()
+
+    return {
+        "status": "success",
+        "segment_index": segment_idx,
+        "original_speaker": orig_speaker,
+        "corrected_speaker": corrected_speaker,
+        "identity_status": "MATCHED",
+        "identity_confidence": 0.99,
+        "message": f"Successfully updated segment {segment_idx} to {corrected_speaker} via Human-Review Route."
+    }
+

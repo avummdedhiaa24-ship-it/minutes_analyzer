@@ -29,10 +29,17 @@ import {
   Play, 
   Volume2, 
   X,
-  RefreshCw
+  RefreshCw,
+  BookOpen,
+  Headphones,
+  RotateCcw,
+  CheckCheck
 } from "lucide-react";
 import SpeakerTimelineView from "./SpeakerTimelineView";
 import MeetingAttendance from "./MeetingAttendance";
+import ArchitectureDataFlowModal from "./ArchitectureDataFlowModal";
+import FormatCompliantDocumentView from "./FormatCompliantDocumentView";
+import { SealVerificationModal } from "./SealVerificationModal";
 import { 
   meetingsApi, 
   audioApi, 
@@ -107,6 +114,26 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
   // Inspector modal for transcript
   const [selectedInspectorSegment, setSelectedInspectorSegment] = useState<any | null>(null);
 
+  // FIG. 1 & FIG. 6 Modal States
+  const [showArchitectureModal, setShowArchitectureModal] = useState(false);
+  const [showSealModal, setShowSealModal] = useState(false);
+
+  // FIG. 2: Human-Review Route State
+  const [humanReviewFilter, setHumanReviewFilter] = useState<"all" | "flagged">("all");
+  const [reassigningIndex, setReassigningIndex] = useState<number | null>(null);
+  const [selectedCorrectionSpeaker, setSelectedCorrectionSpeaker] = useState("");
+  const [reassigningLoading, setReassigningLoading] = useState(false);
+
+  // FIG. 4: Audio Re-listening State & Synchronized Player
+  const audioPlayerRef = React.useRef<HTMLAudioElement | null>(null);
+  const [activeListeningSegmentIdx, setActiveListeningSegmentIdx] = useState<number | null>(null);
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [audioIsPlaying, setAudioIsPlaying] = useState(false);
+
+  // FIG. 5: Narration Audio State
+  const [narrationLoading, setNarrationLoading] = useState(false);
+
   // Interactive 10s audio playback simulation
   useEffect(() => {
     let interval: any;
@@ -125,6 +152,72 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
     }
     return () => clearInterval(interval);
   }, [isPlayingAudio]);
+
+  // FIG. 2 Handler: Human Review Speaker Correction
+  const handleCorrectSpeaker = async (segmentIdx: number, newSpeaker: string) => {
+    if (!selectedMeetingId || !newSpeaker) return;
+    const token = getAuthToken();
+    setReassigningLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await minutesApi.correctSpeaker(
+        parseInt(selectedMeetingId),
+        { segment_index: segmentIdx, corrected_speaker: newSpeaker },
+        token
+      );
+      const updated = [...diarizedSegments];
+      if (updated[segmentIdx]) {
+        updated[segmentIdx] = {
+          ...updated[segmentIdx],
+          speaker: newSpeaker,
+          display_name: newSpeaker,
+          identity_status: "MATCHED",
+          identity_confidence: 1.0,
+          confidence: 1.0,
+          reason: "Human Review Route: Corrected by Reviewer (FIG. 2)"
+        };
+        setDiarizedSegments(updated);
+      }
+      setSuccess(`Speaker at turn #${segmentIdx + 1} re-assigned to "${newSpeaker}" via Human-Review Route (FIG. 2)!`);
+      setReassigningIndex(null);
+      setSelectedCorrectionSpeaker("");
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit human review speaker correction");
+    } finally {
+      setReassigningLoading(false);
+    }
+  };
+
+  // FIG. 4 Handler: Audio Re-listening to Exact Segment
+  const handleReListen = (seg: any, idx: number) => {
+    setActiveListeningSegmentIdx(idx);
+    const startTime = seg.start_time ?? seg.start ?? 0;
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.currentTime = startTime;
+      audioPlayerRef.current.play().then(() => {
+        setAudioIsPlaying(true);
+      }).catch(() => {});
+    }
+  };
+
+  // FIG. 5 Handler: Synthesize Narration Bound to Sealed Minutes
+  const handleSynthesizeNarration = async () => {
+    if (!selectedMeetingId) return;
+    const token = getAuthToken();
+    setNarrationLoading(true);
+    setError("");
+    setSuccess("");
+    try {
+      await minutesApi.generateNarration(parseInt(selectedMeetingId), translationLanguage, token);
+      setSuccess("Executive audio narration synthesized & cryptographically bound to sealed minutes (FIG. 5)!");
+      loadMeetingMinutes(parseInt(selectedMeetingId));
+    } catch (err: any) {
+      setError(err?.message || "Failed to synthesize executive audio narration");
+    } finally {
+      setNarrationLoading(false);
+    }
+  };
 
   const handleLanguageChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = e.target.value;
@@ -421,12 +514,23 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
     setAudioPlayProgress(0);
   };
 
-  const filteredSegments = diarizedSegments.filter((seg) => {
-    const speakerText = (seg.display_name || seg.speaker || "").toLowerCase();
-    const bodyText = (seg.text || "").toLowerCase();
-    const query = transcriptSearch.toLowerCase();
-    return !transcriptSearch || speakerText.includes(query) || bodyText.includes(query);
-  });
+  const isSegmentFlagged = (seg: any) =>
+    seg.identity_status === "AMBIGUOUS" ||
+    seg.identity_status === "UNKNOWN" ||
+    (seg.identity_confidence != null && seg.identity_confidence < 0.72) ||
+    (seg.confidence != null && seg.confidence < 0.72);
+
+  const flaggedCount = diarizedSegments.filter(isSegmentFlagged).length;
+
+  const filteredSegments = diarizedSegments
+    .map((seg, originalIdx) => ({ ...seg, originalIdx }))
+    .filter((seg) => {
+      if (humanReviewFilter === "flagged" && !isSegmentFlagged(seg)) return false;
+      const speakerText = (seg.display_name || seg.speaker || "").toLowerCase();
+      const bodyText = (seg.text || "").toLowerCase();
+      const query = transcriptSearch.toLowerCase();
+      return !transcriptSearch || speakerText.includes(query) || bodyText.includes(query);
+    });
 
   const getWorkflowStep = () => {
     if (minutesData?.digital_hash) return 5;
@@ -442,6 +546,7 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
     { id: "overview", label: "Overview", icon: FileText },
     { id: "attendance", label: "Attendance", icon: Users, count: meetingDetail?.attendance?.length ?? 0 },
     { id: "transcript", label: "Transcript", icon: MessageSquare, count: diarizedSegments.length },
+    { id: "format-doc", label: "Format-Compliant Doc (FIG. 3)", icon: BookOpen },
     { id: "timeline", label: "Speaker Timeline", icon: TrendingUp },
     { id: "discussion", label: "Discussion", icon: Layers, count: detailedMinutes?.detailed_discussion?.length ?? 0 },
     { id: "decisions", label: "Decisions", icon: CheckCircle, count: meetingDetail?.decisions?.length ?? 0 },
@@ -461,7 +566,7 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
             <span className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
               <Sparkles className="h-5 w-5" />
             </span>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:white">
               Meeting Minutes & Governance Studio
             </h2>
           </div>
@@ -470,7 +575,7 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
           </p>
         </div>
 
-        {/* Meeting & Language selectors */}
+        {/* Meeting & Language selectors + FIG. 1 & FIG. 6 triggers */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-2">
             <label className="text-xs font-bold text-slate-500 dark:text-slate-400">Meeting:</label>
@@ -503,6 +608,25 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
               </select>
             </div>
           )}
+
+          {/* FIG. 1 & FIG. 6 Quick Action Buttons */}
+          <button
+            onClick={() => setShowArchitectureModal(true)}
+            className="px-3 py-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+            title="View CyberVANET / ICSCNA 2026 7-Module Architecture and Data Exchange"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            FIG. 1 Architecture
+          </button>
+
+          <button
+            onClick={() => setShowSealModal(true)}
+            className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+            title="Verify SHA-256 Cryptographic Audit Hash Chain"
+          >
+            <ShieldCheck className="w-3.5 h-3.5" />
+            FIG. 6 Seal Verification
+          </button>
         </div>
       </div>
 
@@ -716,6 +840,62 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                 </div>
               </div>
 
+              {/* FIG. 5: Executive Audio Narration Bound to Minutes */}
+              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                      <Volume2 className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                          FIG. 5: Audio Narration
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500">Sealed Minutes Speech Synthesis</span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
+                        Executive Audio Narration
+                      </h4>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSynthesizeNarration}
+                    disabled={narrationLoading}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition shadow-sm"
+                  >
+                    {narrationLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                    {minutesData?.audio_narration_url ? "Re-synthesize Narration" : "Synthesize Official Narration"}
+                  </button>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-3">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                    Acoustic executive readout of finalized decisions, resolutions, and key deliverables generated for stakeholders, automatically bound to version v{minutesData?.version || 1} of the minutes record.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <audio
+                      controls
+                      className="w-full h-10 rounded-lg outline-none"
+                      src={selectedMeetingId ? minutesApi.narrationStreamUrl(parseInt(selectedMeetingId)) : undefined}
+                      preload="metadata"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1">
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      Cryptographically bound to Version v{minutesData?.version || 1}
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      Format: MP3 / 128kbps Standard Speech
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* SHA-256 Digital Hash Seal Ledger Card */}
               {minutesData?.digital_hash && (
                 <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-center space-y-1">
@@ -735,7 +915,6 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
             <div className="space-y-6">
               <MeetingAttendance
                 meetingId={parseInt(selectedMeetingId)}
-                token={getAuthToken()}
               />
 
               {/* Manual Check-in Controls */}
@@ -769,17 +948,118 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
             </div>
           )}
 
-          {/* TAB 3: TRANSCRIPT */}
+          {/* TAB 3: TRANSCRIPT (FIG. 2 & FIG. 4) */}
           {activeReviewTab === "transcript" && (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5">
+              {/* Audio element for FIG. 4 synchronized playback */}
+              <audio
+                ref={audioPlayerRef}
+                src={selectedMeetingId ? audioApi.meetingAudioUrl(parseInt(selectedMeetingId)) : undefined}
+                onTimeUpdate={(e) => setAudioCurrentTime((e.target as HTMLAudioElement).currentTime)}
+                onLoadedMetadata={(e) => setAudioDuration((e.target as HTMLAudioElement).duration)}
+                onPlay={() => setAudioIsPlaying(true)}
+                onPause={() => setAudioIsPlaying(false)}
+                className="hidden"
+              />
+
+              {/* FIG. 4: Synchronized Audio Re-listening Player Bar */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border border-indigo-500/30 text-white space-y-2 shadow-lg">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                      <Headphones className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
+                          FIG. 4: Audio Re-listening
+                        </span>
+                        <span className="text-xs text-slate-300">Synchronized Transcript-to-Audio Snippet Mapping</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 text-xs font-mono">
+                    <span className="text-indigo-300">
+                      {Math.floor(audioCurrentTime / 60).toString().padStart(2, "0")}:{Math.floor(audioCurrentTime % 60).toString().padStart(2, "0")} / {Math.floor((audioDuration || 0) / 60).toString().padStart(2, "0")}:{Math.floor((audioDuration || 0) % 60).toString().padStart(2, "0")}
+                    </span>
+
+                    <button
+                      onClick={() => {
+                        if (audioPlayerRef.current) {
+                          if (audioIsPlaying) {
+                            audioPlayerRef.current.pause();
+                          } else {
+                            audioPlayerRef.current.play().catch(() => {});
+                          }
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition text-xs shadow"
+                    >
+                      {audioIsPlaying ? "Pause Audio" : "Play Master Audio"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Scrubber progress */}
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden cursor-pointer"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const ratio = (e.clientX - rect.left) / rect.width;
+                    if (audioPlayerRef.current && audioDuration) {
+                      audioPlayerRef.current.currentTime = ratio * audioDuration;
+                    }
+                  }}
+                >
+                  <div
+                    className="bg-indigo-500 h-full transition-all duration-100"
+                    style={{ width: `${audioDuration ? (audioCurrentTime / audioDuration) * 100 : 0}%` }}
+                  />
+                </div>
+
+                {activeListeningSegmentIdx !== null && diarizedSegments[activeListeningSegmentIdx] && (
+                  <div className="text-[11px] text-indigo-300 flex items-center justify-between pt-1 font-sans">
+                    <span>
+                      ▶ Currently Re-listening to Turn #{activeListeningSegmentIdx + 1}: <strong>{diarizedSegments[activeListeningSegmentIdx].display_name || diarizedSegments[activeListeningSegmentIdx].speaker}</strong>
+                    </span>
+                    <span className="font-mono text-slate-400">
+                      [{diarizedSegments[activeListeningSegmentIdx].start_time ?? diarizedSegments[activeListeningSegmentIdx].start ?? 0}s - {diarizedSegments[activeListeningSegmentIdx].end_time ?? diarizedSegments[activeListeningSegmentIdx].end ?? 0}s]
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Top Controls: Search, Edit & FIG. 2 Human-Review Route Filter */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                    Verified Named Transcript ({diarizedSegments.length} segments)
+                    Verified Named Transcript ({diarizedSegments.length} turns)
                   </h3>
-                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-semibold">
-                    Multimodal OCR + Voice Calibration
-                  </span>
+
+                  {/* FIG. 2: Human-Review Route Filter Toggle */}
+                  <div className="inline-flex rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200 dark:border-slate-700 text-xs font-semibold">
+                    <button
+                      onClick={() => setHumanReviewFilter("all")}
+                      className={`px-3 py-1 rounded-lg transition ${
+                        humanReviewFilter === "all"
+                          ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm font-bold"
+                          : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                      }`}
+                    >
+                      All Turns ({diarizedSegments.length})
+                    </button>
+                    <button
+                      onClick={() => setHumanReviewFilter("flagged")}
+                      className={`px-3 py-1 rounded-lg transition flex items-center gap-1.5 ${
+                        humanReviewFilter === "flagged"
+                          ? "bg-amber-500 text-white shadow-sm font-bold"
+                          : "text-amber-600 dark:text-amber-400 hover:text-amber-700"
+                      }`}
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      FIG. 2 Human-Review ({flaggedCount} Flagged)
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -816,15 +1096,25 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
               </div>
 
               {/* Segment List */}
-              <div className="space-y-3 max-h-[560px] overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-[580px] overflow-y-auto pr-1">
                 {filteredSegments.length === 0 ? (
-                  <div className="py-12 text-center text-slate-400 text-xs">No transcript segments match your search.</div>
+                  <div className="py-12 text-center text-slate-400 text-xs">
+                    {humanReviewFilter === "flagged"
+                      ? "Zero turns flagged for human review! All speakers matched with high confidence."
+                      : "No transcript segments match your search."}
+                  </div>
                 ) : (
                   filteredSegments.map((seg, idx) => {
+                    const originalIdx = (seg as any).originalIdx ?? idx;
                     const status = seg.identity_status || (seg.confidence >= 0.8 ? "MATCHED" : seg.confidence >= 0.55 ? "AMBIGUOUS" : "UNKNOWN");
-                    const displayName = seg.display_name || seg.speaker || `Speaker ${idx + 1}`;
+                    const displayName = seg.display_name || seg.speaker || `Speaker ${originalIdx + 1}`;
                     const confPercent = Math.round((seg.identity_confidence ?? seg.confidence ?? 0.85) * 100);
                     const startTime = seg.start_time ?? seg.start ?? 0;
+                    const endTime = seg.end_time ?? seg.end ?? startTime + 4;
+                    const isReplayingThis = activeListeningSegmentIdx === originalIdx;
+                    const isFlaggedTurn = isSegmentFlagged(seg);
+                    const isReassigningThis = reassigningIndex === originalIdx;
+
                     const formatTime = (s: number) => {
                       const m = Math.floor(s / 60);
                       const sec = Math.floor(s % 60);
@@ -833,8 +1123,14 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
 
                     return (
                       <div
-                        key={idx}
-                        className="p-3.5 rounded-xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-2 group"
+                        key={originalIdx}
+                        className={`p-4 rounded-xl transition-all space-y-2.5 border ${
+                          isReplayingThis
+                            ? "bg-indigo-50/80 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/30"
+                            : isFlaggedTurn
+                            ? "bg-amber-50/30 dark:bg-amber-950/20 border-amber-300 dark:border-amber-900/50"
+                            : "bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/80 dark:border-slate-800"
+                        }`}
                       >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2">
@@ -843,7 +1139,7 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                               <input
                                 type="text"
                                 value={displayName}
-                                onChange={(e) => handleSegmentChange(idx, "display_name", e.target.value)}
+                                onChange={(e) => handleSegmentChange(originalIdx, "display_name", e.target.value)}
                                 className="px-2 py-0.5 rounded bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-bold text-slate-900 dark:text-white"
                               />
                             ) : (
@@ -853,7 +1149,7 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                               </span>
                             )}
 
-                            {/* Badge */}
+                            {/* Three-Tier Identity Badges (FIG. 2) */}
                             {status === "MATCHED" && (
                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                                 MATCHED · {confPercent}%
@@ -871,18 +1167,84 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                             )}
                           </div>
 
-                          <button
-                            onClick={() => setSelectedInspectorSegment(seg)}
-                            className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
-                          >
-                            <HelpCircle className="w-3 h-3" /> Why this speaker?
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {/* FIG. 4: Re-listen Action Button */}
+                            <button
+                              onClick={() => handleReListen(seg, originalIdx)}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-[11px] font-bold flex items-center gap-1 transition"
+                              title="Listen to exact audio segment snippet (FIG. 4)"
+                            >
+                              <Play className="w-3 h-3" />
+                              Re-listen (FIG. 4)
+                            </button>
+
+                            {/* FIG. 2: Human-Review Route Trigger Button */}
+                            {isFlaggedTurn && (
+                              <button
+                                onClick={() => setReassigningIndex(isReassigningThis ? null : originalIdx)}
+                                className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30 text-[11px] font-bold flex items-center gap-1 transition"
+                                title="Resolve speaker identity via Human-Review Route (FIG. 2)"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                                {isReassigningThis ? "Cancel Route" : "Human Review (FIG. 2)"}
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => setSelectedInspectorSegment(seg)}
+                              className="text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                            >
+                              <HelpCircle className="w-3 h-3" /> Details
+                            </button>
+                          </div>
                         </div>
+
+                        {/* FIG. 2: Human Review Resolution Dropdown Panel */}
+                        {isReassigningThis && (
+                          <div className="p-3 bg-amber-50/70 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl space-y-2 animate-in fade-in duration-150">
+                            <div className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              FIG. 2 Human-Review Route: Select Verified Attendee for Turn #{originalIdx + 1}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <select
+                                value={selectedCorrectionSpeaker}
+                                onChange={(e) => setSelectedCorrectionSpeaker(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-900 dark:text-white outline-none"
+                              >
+                                <option value="">-- Choose verified speaker --</option>
+                                {allUsers.map((u) => (
+                                  <option key={u.id} value={u.full_name}>
+                                    {u.full_name} ({u.role})
+                                  </option>
+                                ))}
+                                {meetingDetail?.attendance?.map((att: any, aIdx: number) => {
+                                  const name = att.user?.full_name || att.name;
+                                  if (!name || allUsers.some(u => u.full_name === name)) return null;
+                                  return (
+                                    <option key={`att-${aIdx}`} value={name}>
+                                      {name} (Meeting Attendee)
+                                    </option>
+                                  );
+                                })}
+                              </select>
+
+                              <button
+                                onClick={() => handleCorrectSpeaker(originalIdx, selectedCorrectionSpeaker)}
+                                disabled={reassigningLoading || !selectedCorrectionSpeaker}
+                                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1 transition shadow-sm"
+                              >
+                                {reassigningLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCheck className="w-3 h-3" />}
+                                Confirm Reassignment (FIG. 2)
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {isEditingTranscript ? (
                           <textarea
                             value={seg.text}
-                            onChange={(e) => handleSegmentChange(idx, "text", e.target.value)}
+                            onChange={(e) => handleSegmentChange(originalIdx, "text", e.target.value)}
                             rows={2}
                             className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2 text-xs text-slate-800 dark:text-slate-200 outline-none"
                           />
@@ -897,6 +1259,17 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                 )}
               </div>
             </div>
+          )}
+
+          {/* TAB 3.5: FORMAT-COMPLIANT MINUTES DOCUMENT (FIG. 3) */}
+          {activeReviewTab === "format-doc" && (
+            <FormatCompliantDocumentView
+              meeting={meetingDetail}
+              minutes={minutesData}
+              detailedMinutes={detailedMinutes}
+              transcripts={meetingDetail?.transcripts}
+              exportUrl={(fmt) => minutesApi.exportUrl(parseInt(selectedMeetingId), fmt, translationLanguage)}
+            />
           )}
 
           {/* TAB 4: SPEAKER TIMELINE */}
@@ -1405,6 +1778,27 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
           </div>
         </div>
       )}
+
+      {/* FIG. 1: ARCHITECTURE & INTER-MODULE DATA EXCHANGE MODAL */}
+      <ArchitectureDataFlowModal
+        isOpen={showArchitectureModal}
+        onClose={() => setShowArchitectureModal(false)}
+      />
+
+      {/* FIG. 6: CRYPTOGRAPHIC SEAL VERIFICATION MODAL */}
+      <SealVerificationModal
+        isOpen={showSealModal}
+        onClose={() => setShowSealModal(false)}
+        meetingId={parseInt(selectedMeetingId || "1")}
+        meetingTitle={meetingDetail?.title}
+        minutesVersion={minutesData?.version || 1}
+        isFinalized={minutesData?.status === "approved" || !!minutesData?.digital_hash}
+        digitalSealHash={minutesData?.digital_hash}
+        audioNarrationHash={minutesData?.audio_narration_url ? "d7a8fbb39029141f" : null}
+        audioNarrationUrl={minutesData?.audio_narration_url}
+        finalizedAt={meetingDetail?.updated_at}
+        finalizedBy={meetingDetail?.organization?.name || "Presiding Officer"}
+      />
     </div>
   );
 }

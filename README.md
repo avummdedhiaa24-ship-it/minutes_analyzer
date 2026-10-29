@@ -86,6 +86,21 @@ graph TD
 
 ---
 
+## 📐 CyberVANET / ICSCNA 2026 Architectural Figures & Core Implementations
+
+This platform directly realizes and provides interactive interfaces for all **6 key figures** specified in the CyberVANET / ICSCNA 2026 research specification:
+
+| Figure | Specification Name | Technical Implementation & Endpoints | Review Studio Interface |
+| :--- | :--- | :--- | :--- |
+| **FIG. 1** | **System Architecture & Data Exchange** | 7 interoperating modules with exact inter-module data schemas (16kHz PCM, VAD regions, tile bounding boxes, 124-dim MFCCs, 3-tier identity, 12-section minutes, SHA-256 seal). | `[🏛️ FIG. 1 Architecture]` interactive modal in `MinutesReviewStudio.tsx` (`ArchitectureDataFlowModal.tsx`). |
+| **FIG. 2** | **Identity Fusion & Three-Tier Decision with Human-Review Route** | 3-tier classification (`MATCHED` $\ge 0.72$, `AMBIGUOUS` $0.55-0.72$, `UNKNOWN` $< 0.55$) in `identity_fusion.py` coupled with backend Human-Review Route `POST /api/v1/minutes/{id}/correct-speaker` logged to `DiarizationCorrection`. | Filter toggle: `[All Turns]` \| `[⚠️ FIG. 2 Human-Review (Flagged)]` with 1-click verified participant reassignment. |
+| **FIG. 3** | **Layout of the Format-Compliant Minutes Document** | 12-section standardized corporate minutes document adhering to corporate governance layout (Quorum verification, Deliberations, Signatories, Deliverables matrix, and SHA-256 seal block). | Dedicated review tab: `Format-Compliant Doc (FIG. 3)` (`FormatCompliantDocumentView.tsx`) with 1-click print and multi-format export. |
+| **FIG. 4** | **Audio Re-listening: Line of Text Mapped to Source Audio Segment** | Synchronized audio playback engine streaming `GET /api/v1/audio/meeting/{id}`. Word/turn timestamps `[start_time, end_time]` map text directly to acoustic segments. | Persistent Synchronized Player Bar + per-segment `[▶ Re-listen (FIG. 4)]` button that seeks audio to the exact segment and highlights the playing turn. |
+| **FIG. 5** | **Transcript-to-Audio Narration Bound to Sealed Minutes Version** | Executive speech synthesis engine (`narration.py`) synthesizing finalized minutes via `POST /api/v1/minutes/{id}/narration`. Audio artifact is SHA-256 digested and cryptographically bound to `models.MinutesVersion`. | Executive Narration Card in Overview & Versions tabs with audio player and `Cryptographically Bound to Version #vN` verification badge. |
+| **FIG. 6** | **Sealing and Verification of the Finalised Record** | Digital sealing ledger computing SHA-256 digests across text, action items, and audio, with public independent audit chain recalculator `GET /api/v1/audit/verify/{id}`. | `[🔒 FIG. 6 Seal Verification]` modal (`SealVerificationModal.tsx`) providing 1-click live hash chain recomputation and tamper-detection proof. |
+
+---
+
 ## ✨ Core Platform Capabilities
 
 ### 1. Multimodal OCR + Voice Identity Fusion (`identity_fusion.py`)

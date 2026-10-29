@@ -10,7 +10,7 @@ export interface ParticipantProfile {
   department: string;
   consentGranted: boolean;
   samples: { index: number; quality: number; snr: number; status: "accepted" | "rejected" }[];
-  isCalibrated: bool;
+  isCalibrated: boolean;
   overallQuality: number;
 }
 

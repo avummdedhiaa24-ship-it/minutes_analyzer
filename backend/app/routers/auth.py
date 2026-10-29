@@ -36,8 +36,8 @@ def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> models.User:
-    # 1. Try token from Bearer header, 2. Fallback to HttpOnly cookie
-    actual_token = token or request.cookies.get("auth_token")
+    # 1. Try token from Bearer header, 2. Fallback to HttpOnly cookie, 3. Fallback to query param
+    actual_token = token or request.cookies.get("auth_token") or request.query_params.get("token")
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

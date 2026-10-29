@@ -139,8 +139,22 @@ export const audioApi = {
     return apiRequest(`/audio/transcript/${meetingId}/regenerate-minutes`, "POST", null, token);
   },
 
-  meetingAudioUrl: (meetingId: number) => {
-    return `${BASE_URL}/audio/meeting/${meetingId}`;
+  meetingAudioUrl: (meetingId: number, token?: string | null) => {
+    const activeToken = token || getAuthToken();
+    const query = activeToken ? `?token=${encodeURIComponent(activeToken)}` : "";
+    return `${BASE_URL}/audio/meeting/${meetingId}${query}`;
+  },
+
+  getSyncMap: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/${meetingId}/sync-map`, "GET", null, token);
+  },
+
+  getIntegrity: (meetingId: number, token?: string | null) => {
+    return apiRequest(`/audio/${meetingId}/integrity`, "GET", null, token);
+  },
+
+  logDownload: (meetingId: number, payload: { download_type: string; sha256: string; file_name?: string }, token?: string | null) => {
+    return apiRequest(`/audio/${meetingId}/log-download`, "POST", payload, token);
   },
 };
 

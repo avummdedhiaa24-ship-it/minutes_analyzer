@@ -3,18 +3,27 @@ import uuid
 import shutil
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import get_db
 from app import models, schemas
-from app.routers.auth import get_current_user
+from app.routers.auth import get_current_user, RoleChecker
 from app.services.ai_pipeline import ai_pipeline
 from app.services.rag import rag_service
+from app.services.audio_sync import audio_sync_service
 
 logger = logging.getLogger(__name__)
+
+audio_playback_roles = [
+    "System Admin", "CEO", "Manager", "Admin", "Secretary",
+    "Department Lead", "Director", "Reviewer", "Employee",
+    "SUPER_ADMIN", "ORG_ADMIN", "HOST", "AUDITOR", "PARTICIPANT", "Participant",
+    "Presiding Officer", "officer"
+]
+can_playback_audio = RoleChecker(audio_playback_roles)
 
 router = APIRouter(prefix="/audio", tags=["Audio & Transcript Pipeline"])
 
@@ -350,12 +359,14 @@ def stream_audio(
 @router.get("/meeting/{meeting_id}")
 def stream_meeting_audio(
     meeting_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(can_playback_audio)
 ):
     """
     FIG. 4: Audio Re-listening source endpoint.
     Streams the meeting's source audio recording so each line of transcript
     maps directly to its audio snippet for synchronized playback.
+    Requires authenticated user with authorized playback role.
     """
     meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
     if not meeting:
@@ -381,21 +392,81 @@ def stream_meeting_audio(
         if os.path.exists(cand):
             return FileResponse(cand, media_type="audio/wav" if ext == ".wav" else "audio/mpeg")
 
-    # 4. Synthesize playback audio from transcript segments if no raw file was uploaded
-    tr = db.query(models.Transcript).filter(models.Transcript.meeting_id == meeting_id).first()
-    if tr and tr.raw_text:
-        cached_synth = os.path.join(settings.UPLOAD_DIR, f"synthetic_meeting_{meeting_id}.mp3")
-        if not os.path.exists(cached_synth):
-            try:
-                from gtts import gTTS
-                tts = gTTS(text=tr.raw_text, lang="en", slow=False)
-                tts.save(cached_synth)
-            except Exception:
-                pass
-        if os.path.exists(cached_synth):
-            return FileResponse(cached_synth, media_type="audio/mpeg")
-
+    # Strict: No synthetic TTS fallback. If no genuine meeting recording exists, return 404.
     raise HTTPException(status_code=404, detail="No audio source available for this meeting.")
+
+@router.get("/{meeting_id}/sync-map")
+def get_meeting_sync_map(
+    meeting_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(can_playback_audio)
+):
+    """
+    A4: Two-way double-click audio-transcript sync map.
+    Returns: [{segment_index, word_index, text, start, end, speaker, identity_status}]
+    Cached per transcript version; returns timing_status='unavailable' for edited text.
+    """
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    sync_map = audio_sync_service.get_sync_map(meeting_id, db)
+    return sync_map
+
+@router.get("/{meeting_id}/integrity")
+def get_meeting_audio_integrity(
+    meeting_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(can_playback_audio)
+):
+    """
+    B2 & B4: Cryptographic audio integrity & consent verification.
+    Returns: {meeting_id, sha256, size_bytes, recorded_at, consent_granted, withheld_speakers, consent_message}
+    """
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    integrity = audio_sync_service.get_audio_integrity(meeting_id, db)
+    if not integrity:
+        raise HTTPException(status_code=404, detail="No audio source available for this meeting.")
+
+    return integrity
+
+@router.post("/{meeting_id}/log-download")
+def log_audio_download(
+    meeting_id: int,
+    payload: Dict[str, Any],
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(can_playback_audio)
+):
+    """
+    B4: Logs local audio save / offline caching to tamper-evident audit ledger.
+    """
+    meeting = db.query(models.Meeting).filter(models.Meeting.id == meeting_id).first()
+    if not meeting:
+        raise HTTPException(status_code=404, detail="Meeting not found")
+
+    from app.services.audit import audit_service
+    download_type = payload.get("download_type", "device_file")
+    sha256_hash = payload.get("sha256", "")
+    
+    audit_service.log_change(
+        db=db,
+        meeting_id=meeting_id,
+        modified_by_id=current_user.id,
+        action="AUDIO_OFFLINE_SAVED" if download_type == "offline_indexeddb" else "AUDIO_LOCAL_DOWNLOAD",
+        previous_state=None,
+        current_state={
+            "user": current_user.username,
+            "role": current_user.role,
+            "download_type": download_type,
+            "sha256": sha256_hash,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    )
+
+    return {"status": "logged", "meeting_id": meeting_id, "download_type": download_type}
 
 @router.get("/transcript/{meeting_id}", response_model=schemas.TranscriptResponse)
 def get_transcript(
@@ -429,21 +500,38 @@ def update_transcript(
         "diarized_json": transcript.diarized_json
     }
 
-    if transcript_in.raw_text is not None:
+    if transcript_in.raw_text is not None and transcript_in.diarized_json is None:
         transcript.raw_text = transcript_in.raw_text
+        # Invalidate word timings on existing diarized segments if raw text was edited
+        if transcript.diarized_json:
+            updated_segs = []
+            for s in transcript.diarized_json:
+                s_copy = dict(s)
+                s_copy["is_edited"] = True
+                updated_segs.append(s_copy)
+            transcript.diarized_json = updated_segs
+
     if transcript_in.diarized_json is not None:
-        # Convert schema objects or dicts to JSON list
+        # Convert schema objects or dicts to JSON list and mark edited turns
+        prev_segs = prev_state.get("diarized_json") or []
         formatted_diarized = []
-        for item in transcript_in.diarized_json:
-            if hasattr(item, "dict"):
-                formatted_diarized.append(item.dict())
-            elif isinstance(item, dict):
-                formatted_diarized.append(item)
+        for i, item in enumerate(transcript_in.diarized_json):
+            d_item = item.dict() if hasattr(item, "dict") else dict(item)
+            # Detect if text was modified
+            if i < len(prev_segs):
+                old_text = prev_segs[i].get("text", "")
+                new_text = d_item.get("text", "")
+                if old_text != new_text:
+                    d_item["is_edited"] = True
+            formatted_diarized.append(d_item)
         transcript.diarized_json = formatted_diarized
 
         # If raw_text wasn't explicitly provided, reconstruct raw_text from diarized segments
         if transcript_in.raw_text is None and formatted_diarized:
             transcript.raw_text = " ".join([f"[{seg.get('speaker', 'Speaker')}]: {seg.get('text', '')}" for seg in formatted_diarized])
+
+    # Invalidate cached sync map
+    audio_sync_service._sync_map_cache.clear()
 
     current_state = {
         "raw_text": transcript.raw_text,

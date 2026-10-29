@@ -40,6 +40,9 @@ import MeetingAttendance from "./MeetingAttendance";
 import ArchitectureDataFlowModal from "./ArchitectureDataFlowModal";
 import FormatCompliantDocumentView from "./FormatCompliantDocumentView";
 import { SealVerificationModal } from "./SealVerificationModal";
+import { useAudioSync, SyncWord } from "./useAudioSync";
+import { SyncedTranscript } from "./SyncedTranscript";
+import { LocalAudioSaver } from "./LocalAudioSaver";
 import { 
   meetingsApi, 
   audioApi, 
@@ -130,6 +133,76 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
   const [audioCurrentTime, setAudioCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [audioIsPlaying, setAudioIsPlaying] = useState(false);
+  const [syncMap, setSyncMap] = useState<SyncWord[]>([]);
+  const [offlineAudioUrl, setOfflineAudioUrl] = useState<string | null>(null);
+
+  // Audio Sync Hook (Feature A)
+  const {
+    timeIndex,
+    leadInSeconds,
+    setLeadInSeconds,
+    continuePlaying,
+    setContinuePlaying,
+    activeWordSyncIdx,
+    activeSegmentIdx,
+    isAutoScrollPaused,
+    setIsAutoScrollPaused,
+    evidenceClips,
+    scrollContainerRef,
+    jumpToWord,
+    jumpFromAudioTimeToTranscript,
+    handleTimeUpdate,
+    jumpToEvidenceClips,
+    stepEvidenceClip,
+    clearEvidenceClips,
+  } = useAudioSync({
+    audioPlayerRef,
+    syncMap,
+    diarizedSegments,
+    onTimingUnavailable: (msg) => {
+      setError(msg);
+      setTimeout(() => setError(""), 4000);
+    },
+  });
+
+  // Supporting segments locator for Decisions and Action Items (A1)
+  const findSupportingSegments = (sourceTimestamp?: any, textSnippet?: string): number[] => {
+    const matches: number[] = [];
+    if (!diarizedSegments || diarizedSegments.length === 0) return [0];
+
+    let targetSec: number | null = null;
+    if (typeof sourceTimestamp === "number") {
+      targetSec = sourceTimestamp;
+    } else if (typeof sourceTimestamp === "string" && sourceTimestamp.includes(":")) {
+      const parts = sourceTimestamp.split(":").map(Number);
+      if (parts.length === 3) targetSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      else if (parts.length === 2) targetSec = parts[0] * 60 + parts[1];
+    } else if (typeof sourceTimestamp === "string") {
+      const parsed = parseFloat(sourceTimestamp);
+      if (!isNaN(parsed)) targetSec = parsed;
+    }
+
+    if (targetSec !== null) {
+      diarizedSegments.forEach((seg, idx) => {
+        const s = seg.start ?? 0;
+        const e = seg.end ?? s + 3.0;
+        if (Math.abs(s - targetSec!) < 3.0 || (targetSec! >= s && targetSec! <= e)) {
+          matches.push(idx);
+        }
+      });
+    }
+
+    if (matches.length === 0 && textSnippet) {
+      const cleanSnippet = textSnippet.toLowerCase().slice(0, 30);
+      diarizedSegments.forEach((seg, idx) => {
+        if ((seg.text || "").toLowerCase().includes(cleanSnippet)) {
+          matches.push(idx);
+        }
+      });
+    }
+
+    return matches.length > 0 ? matches : [0];
+  };
 
   // FIG. 5: Narration Audio State
   const [narrationLoading, setNarrationLoading] = useState(false);
@@ -302,6 +375,14 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
         setDiarizedSegments([]);
       }
 
+      // Populate Sync-Map State (A4)
+      try {
+        const sm = await audioApi.getSyncMap(meetingId, token);
+        setSyncMap(Array.isArray(sm) ? sm : []);
+      } catch (smErr) {
+        setSyncMap([]);
+      }
+
       // Populate Minutes State
       try {
         const minutes = await minutesApi.get(meetingId, token);
@@ -382,6 +463,12 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
       setRawText(updated.raw_text || "");
       setIsEditingTranscript(false);
       setSuccess("Transcript updated & saved successfully.");
+
+      // Refresh sync map for edited text timing (A4)
+      try {
+        const sm = await audioApi.getSyncMap(parseInt(selectedMeetingId), token);
+        setSyncMap(Array.isArray(sm) ? sm : []);
+      } catch (smErr) {}
       
       const detail = await meetingsApi.get(parseInt(selectedMeetingId), token);
       setMeetingDetail(detail);
@@ -954,8 +1041,12 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
               {/* Audio element for FIG. 4 synchronized playback */}
               <audio
                 ref={audioPlayerRef}
-                src={selectedMeetingId ? audioApi.meetingAudioUrl(parseInt(selectedMeetingId)) : undefined}
-                onTimeUpdate={(e) => setAudioCurrentTime((e.target as HTMLAudioElement).currentTime)}
+                src={offlineAudioUrl || (selectedMeetingId ? audioApi.meetingAudioUrl(parseInt(selectedMeetingId), getAuthToken()) : undefined)}
+                onTimeUpdate={(e) => {
+                  const ct = (e.target as HTMLAudioElement).currentTime;
+                  setAudioCurrentTime(ct);
+                  handleTimeUpdate(ct);
+                }}
                 onLoadedMetadata={(e) => setAudioDuration((e.target as HTMLAudioElement).duration)}
                 onPlay={() => setAudioIsPlaying(true)}
                 onPause={() => setAudioIsPlaying(false)}
@@ -972,9 +1063,9 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded-full border border-indigo-500/30">
-                          FIG. 4: Audio Re-listening
+                          FIG. 4: Audio Re-listening & Double-Click Sync
                         </span>
-                        <span className="text-xs text-slate-300">Synchronized Transcript-to-Audio Snippet Mapping</span>
+                        <span className="text-xs text-slate-300">Double-click words to seek • Double-click scrubber to scroll transcript</span>
                       </div>
                     </div>
                   </div>
@@ -1001,13 +1092,24 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                   </div>
                 </div>
 
-                {/* Scrubber progress */}
-                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden cursor-pointer"
+                {/* Scrubber progress: single click seeks, double click jumps transcript (Feature A2) */}
+                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden cursor-pointer relative"
+                  title="Single click seeks audio • Double click jumps transcript to this time (A2)"
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const ratio = (e.clientX - rect.left) / rect.width;
                     if (audioPlayerRef.current && audioDuration) {
                       audioPlayerRef.current.currentTime = ratio * audioDuration;
+                    }
+                  }}
+                  onDoubleClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const ratio = (e.clientX - rect.left) / rect.width;
+                    if (audioPlayerRef.current && audioDuration) {
+                      const targetTime = ratio * audioDuration;
+                      audioPlayerRef.current.currentTime = targetTime;
+                      audioPlayerRef.current.play().catch(() => {});
+                      jumpFromAudioTimeToTranscript(targetTime);
                     }
                   }}
                 >
@@ -1028,6 +1130,21 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                   </div>
                 )}
               </div>
+
+              {/* Feature B: Local Audio Saver & Offline Vault */}
+              {selectedMeetingId && (
+                <LocalAudioSaver
+                  meetingId={parseInt(selectedMeetingId)}
+                  syncMap={syncMap}
+                  onOfflineAudioLoaded={(url, offlineMap) => {
+                    setOfflineAudioUrl(url);
+                    if (offlineMap && offlineMap.length > 0) {
+                      setSyncMap(offlineMap);
+                    }
+                    setSuccess("Offline recording and sync-map loaded from device storage!");
+                  }}
+                />
+              )}
 
               {/* Top Controls: Search, Edit & FIG. 2 Human-Review Route Filter */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
@@ -1095,9 +1212,33 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                 </div>
               </div>
 
-              {/* Segment List */}
-              <div className="space-y-3 max-h-[580px] overflow-y-auto pr-1">
-                {filteredSegments.length === 0 ? (
+              {!isEditingTranscript ? (
+                /* Feature A: Synced Interactive Transcript */
+                <SyncedTranscript
+                  segments={filteredSegments}
+                  syncMap={syncMap}
+                  activeWordSyncIdx={activeWordSyncIdx}
+                  activeSegmentIdx={activeSegmentIdx}
+                  isAutoScrollPaused={isAutoScrollPaused}
+                  leadInSeconds={leadInSeconds}
+                  continuePlaying={continuePlaying}
+                  evidenceClips={evidenceClips}
+                  scrollContainerRef={scrollContainerRef}
+                  onWordDoubleClick={(segIdx, wordIdx) => jumpToWord(segIdx, wordIdx, false)}
+                  onLineDoubleClick={(segIdx) => jumpToWord(segIdx, 0, true)}
+                  onLeadInChange={setLeadInSeconds}
+                  onContinuePlayingToggle={setContinuePlaying}
+                  onResumeAutoScroll={() => setIsAutoScrollPaused(false)}
+                  onStepEvidence={stepEvidenceClip}
+                  onClearEvidence={clearEvidenceClips}
+                  onReassignSpeaker={(segIdx) => {
+                    setReassigningIndex(segIdx);
+                    setSelectedCorrectionSpeaker("");
+                  }}
+                />
+              ) : (
+                <div className="space-y-3 max-h-[580px] overflow-y-auto pr-1">
+                  {filteredSegments.length === 0 ? (
                   <div className="py-12 text-center text-slate-400 text-xs">
                     {humanReviewFilter === "flagged"
                       ? "Zero turns flagged for human review! All speakers matched with high confidence."
@@ -1257,7 +1398,8 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                     );
                   })
                 )}
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1356,7 +1498,16 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
               {meetingDetail?.decisions && meetingDetail.decisions.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {meetingDetail.decisions.map((dec: any, idx: number) => (
-                    <div key={dec.id || idx} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5">
+                    <div
+                      key={dec.id || idx}
+                      onDoubleClick={() => {
+                        const supp = findSupportingSegments(dec.timestamp || dec.source_timestamp, dec.title || dec.decision_text);
+                        jumpToEvidenceClips(dec.id || `dec-${idx}`, dec.title || dec.decision_text, supp);
+                        setActiveReviewTab("transcript");
+                      }}
+                      className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 space-y-2.5 cursor-pointer hover:border-indigo-400 hover:shadow-sm transition"
+                      title="Double-click to listen to audio evidence clips (Feature A1)"
+                    >
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                           Decision #{idx + 1}
@@ -1424,7 +1575,16 @@ export default function MinutesReviewStudio({ initialMeetingId, initialTab = "ov
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {meetingDetail.action_items.map((act: any) => (
-                        <tr key={act.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
+                        <tr
+                          key={act.id}
+                          onDoubleClick={() => {
+                            const supp = findSupportingSegments(act.source_timestamp, act.title || act.description);
+                            jumpToEvidenceClips(act.id || `act-${act.id}`, act.title, supp);
+                            setActiveReviewTab("transcript");
+                          }}
+                          className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 cursor-pointer"
+                          title="Double-click to listen to audio evidence clips (Feature A1)"
+                        >
                           <td className="p-3 font-semibold text-slate-900 dark:text-white">{act.title}</td>
                           <td className="p-3 text-slate-600 dark:text-slate-300 font-medium">{act.responsible_person || "Unassigned"}</td>
                           <td className="p-3 text-slate-500 font-mono text-[11px]">{act.due_date ? new Date(act.due_date).toLocaleDateString() : "TBD"}</td>
